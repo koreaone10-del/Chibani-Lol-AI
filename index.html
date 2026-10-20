@@ -25,6 +25,9 @@
       <button class="nav-btn active" data-tab="workspace" onclick="switchTab('workspace')">
         <span>🚀</span> <span data-i18n="nav_workspace">غرفة العمليات (Workspace)</span>
       </button>
+      <button class="nav-btn" data-tab="prompts" onclick="switchTab('prompts')">
+        <span>🎯</span> <span data-i18n="nav_prompts">مكتبة السيناريوهات (Prompt Library)</span>
+      </button>
       <button class="nav-btn" data-tab="config" onclick="switchTab('config')">
         <span>⚙️</span> <span data-i18n="nav_config">الإعدادات و .env و MCP</span>
       </button>
@@ -69,29 +72,25 @@
 
           <div class="phone-wrapper">
             <div class="phone-frame" id="phone-screen">
-              <!-- شريط حالة الهاتف -->
               <div class="phone-statusbar">
                 <span>12:45</span>
                 <span>ARTEMIS Helper ●</span>
                 <span>🔋 94%</span>
               </div>
 
-              <!-- طبقة شبكة الإحداثيات 0-1000 -->
               <div class="coord-grid" id="coord-grid"></div>
 
-              <!-- مؤشر النقرة البصري (Target Overlay) -->
               <div class="target-reticle" id="target-reticle" style="display: none;">
                 <span class="coord-label" id="coord-label">(500, 500)</span>
               </div>
 
-              <!-- محتوى شاشة الأندرويد التفاعلي -->
               <div class="phone-app-view" id="phone-app-view">
                 <div class="app-screen-header" id="screen-title">Android Home / Settings</div>
                 <div class="app-ui-elements" id="screen-elements">
                   <div class="mock-ui-card" data-coord="500,260">⚙️ Settings (الإعدادات)</div>
                   <div class="mock-ui-card" data-coord="500,420">🔋 Battery & Performance (البطارية)</div>
-                  <div class="mock-ui-card" data-coord="500,580">🛒 Flutter E-Commerce POS App</div>
-                  <div class="mock-ui-card" data-coord="500,740">🗺️ Google Maps → YouTube Flow</div>
+                  <div class="mock-ui-card" data-coord="500,580">🛒 Flutter E-Commerce & COD Store</div>
+                  <div class="mock-ui-card" data-coord="500,740">🧾 Smart POS Cashier Terminal</div>
                 </div>
               </div>
 
@@ -123,7 +122,6 @@
             </div>
           </div>
 
-          <!-- إعدادات التشغيل السريعة للجلسة -->
           <div class="execution-toolbar">
             <div class="tool-group">
               <label data-i18n="lbl_profile">نمط التنفيذ:</label>
@@ -135,7 +133,7 @@
 
             <div class="tool-group">
               <label data-i18n="lbl_verify">مستوى التحقق (Pro):</label>
-              <select id="exec-verify">
+              <select id="exec-verify" onchange="updateLiveCliCommand()">
                 <option value="final">final (افتراضي)</option>
                 <option value="checkpoints">checkpoints (المعالم)</option>
                 <option value="strict">strict (صارم جدا)</option>
@@ -152,18 +150,14 @@
             </div>
           </div>
 
-          <!-- نافذة عرض خطوات الوكيل -->
           <div id="stream-steps-view" class="stream-box">
             <div class="empty-state" id="stream-empty" data-i18n="stream_empty_msg">
-              أدخل مهمة باللغة الطبيعية في شريط الأوامر بالأسفل أو اختر سيناريو جاهز لمشاهدة دورة (Observe → Think → Safety Check → Act) مباشرة.
+              أدخل مهمة باللغة الطبيعية في شريط الأوامر بالأسفل أو اختر سيناريو من «مكتبة السيناريوهات» لمشاهدة دورة (Observe → Think → Safety Check → Act) مباشرة.
             </div>
             <div id="agent-steps-list" class="steps-list"></div>
           </div>
 
-          <!-- نافذة شجرة XML -->
           <pre id="stream-xml-view" class="stream-box code-view" style="display: none;"></pre>
-
-          <!-- نافذة سجل Logcat -->
           <pre id="stream-logcat-view" class="stream-box code-view" style="display: none;"></pre>
 
           <!-- ④ Prompt Dock -->
@@ -172,9 +166,10 @@
               <button class="chip" onclick="fillPreset('battery')" data-i18n="preset_battery">🔋 فحص نسبة البطارية</button>
               <button class="chip" onclick="fillPreset('flutter')" data-i18n="preset_flutter">🛒 اختبار متجر Flutter وإتمام السلة</button>
               <button class="chip" onclick="fillPreset('crossapp')" data-i18n="preset_crossapp">🗺️ سيناريو مشترك (Maps ← YouTube)</button>
+              <button class="chip chip-highlight" onclick="switchTab('prompts')" data-i18n="btn_open_library">🎯 فتح مكتبة الـ 12 سيناريو الجاهزة</button>
             </div>
             <div class="prompt-input-row">
-              <input type="text" id="task-prompt" data-i18n-placeholder="prompt_placeholder" placeholder="اكتب مهمتك باللغة الطبيعية... مثال: افتح الإعدادات، انتقل إلى البطارية وتحقق من النسبة" />
+              <input type="text" id="task-prompt" oninput="updateLiveCliCommand()" data-i18n-placeholder="prompt_placeholder" placeholder="اكتب مهمتك باللغة الطبيعية... مثال: افتح الإعدادات، انتقل إلى البطارية وتحقق من النسبة" />
               <button class="btn-primary" id="run-btn" onclick="executeTask()">
                 <span>▶</span> <span data-i18n="btn_run">تشغيل المهمة</span>
               </button>
@@ -208,10 +203,38 @@
       </div>
     </section>
 
-    <!-- ==================== TAB 2: CONFIG & .ENV & MCP STUDIO ==================== -->
+    <!-- ==================== TAB 2: PROMPT LIBRARY (NEW!) ==================== -->
+    <section id="tab-prompts" class="tab-content">
+      <div class="panel">
+        <div class="panel-header prompt-lib-header">
+          <div>
+            <h2 data-i18n="lib_title">🎯 مكتبة الأوامر والسيناريوهات الجاهزة (ARTEMIS Prompt Library)</h2>
+            <p class="panel-desc" data-i18n="lib_subtitle">
+              سيناريوهات اختبار احترافية مسبقة الضبط لتطبيقات المتاجر الإلكترونية (E-Commerce & COD)، أنظمة نقاط البيع (POS)، وتطبيقات Flutter & Custom Canvas.
+            </p>
+          </div>
+          <div class="lib-search-box">
+            <input type="text" id="prompt-search" oninput="filterPrompts()" data-i18n-placeholder="lib_search_placeholder" placeholder="🔍 ابحث عن سيناريو (مثال: سلة، Flutter، فاتورة، COD)..." />
+          </div>
+        </div>
+
+        <!-- أزرار فلترة الفئات -->
+        <div class="lib-categories">
+          <button class="cat-btn active" data-cat="all" onclick="setPromptCategory('all')" data-i18n="cat_all">🌟 جميع السيناريوهات (12)</button>
+          <button class="cat-btn" data-cat="ecommerce" onclick="setPromptCategory('ecommerce')" data-i18n="cat_ecommerce">🛒 المتاجر الإلكترونية و COD</button>
+          <button class="cat-btn" data-cat="pos" onclick="setPromptCategory('pos')" data-i18n="cat_pos">🧾 أنظمة نقاط البيع والكاشير (POS)</button>
+          <button class="cat-btn" data-cat="flutter" onclick="setPromptCategory('flutter')" data-i18n="cat_flutter">🦋 تطبيقات Flutter و Canvas</button>
+          <button class="cat-btn" data-cat="stress" onclick="setPromptCategory('stress')" data-i18n="cat_stress">🔄 المراقبة المستمرة و Cross-App</button>
+        </div>
+
+        <!-- شبكة بطاقات السيناريوهات -->
+        <div class="prompt-cards-grid" id="prompt-cards-container"></div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 3: CONFIG & .ENV & MCP STUDIO ==================== -->
     <section id="tab-config" class="tab-content">
       <div class="config-grid">
-        <!-- إعداد مفتاح الذكاء الاصطناعي ومولد .env -->
         <div class="panel">
           <div class="panel-header">
             <h2 data-i18n="cfg_env_title">🔑 إعدادات مزود الذكاء الاصطناعي ومولد ملف (.env)</h2>
@@ -283,7 +306,6 @@
           </div>
         </div>
 
-        <!-- مولد إعدادات MCP لبيئات البرمجة -->
         <div class="panel">
           <div class="panel-header">
             <h2 data-i18n="cfg_mcp_title">🔌 مولد تكامل MCP مع محررات الأكواد الذكية (AI IDEs)</h2>
@@ -332,7 +354,7 @@
       </div>
     </section>
 
-    <!-- ==================== TAB 3: DOCTOR & WEBUSB ==================== -->
+    <!-- ==================== TAB 4: DOCTOR & WEBUSB ==================== -->
     <section id="tab-doctor" class="tab-content">
       <div class="panel">
         <div class="panel-header">
@@ -361,7 +383,7 @@
       </div>
     </section>
 
-    <!-- ==================== TAB 4: ENGINEERING DOCS ==================== -->
+    <!-- ==================== TAB 5: ENGINEERING DOCS ==================== -->
     <section id="tab-docs" class="tab-content">
       <div class="panel docs-panel">
         <h2 data-i18n="docs_header">📚 الدليل المرجعي الكامل لأوامر وخصائص Google ARTEMIS</h2>

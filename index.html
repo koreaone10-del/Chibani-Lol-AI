@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" id="html-root">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CHIBANI LOL AI — Next-Gen Android AI Automation Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- الشريط العلوي (Header & View Switcher & Language Selector) -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo-orb">⚡</div>
+      <div>
+        <h1 class="brand-title">CHIBANI LOL AI</h1>
+        <span class="brand-subtitle" data-i18n="subtitle">منصة أتمتة واختبار أندرويد بالذكاء الاصطناعي — محرك ARTEMIS المتقدم</span>
+      </div>
+    </div>
+
+    <!-- ① View Switcher -->
+    <nav class="view-switcher">
+      <button class="nav-btn active" data-tab="workspace" onclick="switchTab('workspace')">
+        <span>🚀</span> <span data-i18n="nav_workspace">غرفة العمليات (Workspace)</span>
+      </button>
+      <button class="nav-btn" data-tab="config" onclick="switchTab('config')">
+        <span>⚙️</span> <span data-i18n="nav_config">الإعدادات و .env و MCP</span>
+      </button>
+      <button class="nav-btn" data-tab="doctor" onclick="switchTab('doctor')">
+        <span>🩺</span> <span data-i18n="nav_doctor">الفحص الشامل (Doctor & WebUSB)</span>
+      </button>
+      <button class="nav-btn" data-tab="docs" onclick="switchTab('docs')">
+        <span>📚</span> <span data-i18n="nav_docs">المرجع الهندسي الشامل</span>
+      </button>
+    </nav>
+
+    <!-- القائمة العلوية للغات وحالة الاتصال -->
+    <div class="top-actions">
+      <div class="status-pill" id="api-status-pill">
+        <span class="dot" id="api-dot"></span>
+        <span id="api-status-text" data-i18n="status_sim">الوضع الذكي جاهز</span>
+      </div>
+      <select id="lang-select" class="lang-select" onchange="changeLanguage(this.value)" aria-label="Language">
+        <option value="ar">🇩🇿 العربية (AR)</option>
+        <option value="en">🇺🇸 English (EN)</option>
+        <option value="fr">🇫🇷 Français (FR)</option>
+        <option value="es">🇪🇸 Español (ES)</option>
+        <option value="tr">🇹🇷 Türkçe (TR)</option>
+        <option value="zh">🇨🇳 中文 (ZH)</option>
+      </select>
+    </div>
+  </header>
+
+  <!-- المحتوى الرئيسي -->
+  <main class="main-container">
+
+    <!-- ==================== TAB 1: WORKSPACE ==================== -->
+    <section id="tab-workspace" class="tab-content active">
+      <div class="workspace-grid">
+
+        <!-- ② Model & Replay + Live Device Screen -->
+        <div class="panel device-panel">
+          <div class="panel-header">
+            <h2 data-i18n="panel_device_title">📱 شاشة الجهاز وشبكة الإحداثيات (0-1000)</h2>
+            <span class="badge" id="active-profile-badge">FLASH (3-5s)</span>
+          </div>
+
+          <div class="phone-wrapper">
+            <div class="phone-frame" id="phone-screen">
+              <!-- شريط حالة الهاتف -->
+              <div class="phone-statusbar">
+                <span>12:45</span>
+                <span>ARTEMIS Helper ●</span>
+                <span>🔋 94%</span>
+              </div>
+
+              <!-- طبقة شبكة الإحداثيات 0-1000 -->
+              <div class="coord-grid" id="coord-grid"></div>
+
+              <!-- مؤشر النقرة البصري (Target Overlay) -->
+              <div class="target-reticle" id="target-reticle" style="display: none;">
+                <span class="coord-label" id="coord-label">(500, 500)</span>
+              </div>
+
+              <!-- محتوى شاشة الأندرويد التفاعلي -->
+              <div class="phone-app-view" id="phone-app-view">
+                <div class="app-screen-header" id="screen-title">Android Home / Settings</div>
+                <div class="app-ui-elements" id="screen-elements">
+                  <div class="mock-ui-card" data-coord="500,260">⚙️ Settings (الإعدادات)</div>
+                  <div class="mock-ui-card" data-coord="500,420">🔋 Battery & Performance (البطارية)</div>
+                  <div class="mock-ui-card" data-coord="500,580">🛒 Flutter E-Commerce POS App</div>
+                  <div class="mock-ui-card" data-coord="500,740">🗺️ Google Maps → YouTube Flow</div>
+                </div>
+              </div>
+
+              <div class="phone-navbar">
+                <span>◀</span>
+                <span>●</span>
+                <span>■</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="device-controls">
+            <label class="toggle-control">
+              <input type="checkbox" id="toggle-grid" checked onchange="toggleCoordGrid(this.checked)" />
+              <span data-i18n="show_grid">إظهار شبكة الإحداثيات (0-1000)</span>
+            </label>
+            <button class="btn-secondary btn-sm" onclick="connectWebUSB()" data-i18n="btn_connect_usb">🔌 ربط هاتف حقيقي (WebUSB)</button>
+          </div>
+        </div>
+
+        <!-- ③ Live Agent Stream & Reasoning -->
+        <div class="panel stream-panel">
+          <div class="panel-header">
+            <h2 data-i18n="panel_stream_title">🧠 تدفق الوكيل الحي (Live Agent Stream & Telemetry)</h2>
+            <div class="stream-tabs">
+              <button class="mini-tab active" onclick="switchStreamView('steps')" data-i18n="tab_steps">خطوات الوكيل</button>
+              <button class="mini-tab" onclick="switchStreamView('xml')" data-i18n="tab_xml">شجرة الواجهة XML</button>
+              <button class="mini-tab" onclick="switchStreamView('logcat')" data-i18n="tab_logcat">سجل Logcat</button>
+            </div>
+          </div>
+
+          <!-- إعدادات التشغيل السريعة للجلسة -->
+          <div class="execution-toolbar">
+            <div class="tool-group">
+              <label data-i18n="lbl_profile">نمط التنفيذ:</label>
+              <select id="exec-profile" onchange="updateProfileBadge()">
+                <option value="flash">⚡ Flash (Reactive 3-5s)</option>
+                <option value="pro">🛡️ Pro (Planner + Operator + Checker)</option>
+              </select>
+            </div>
+
+            <div class="tool-group">
+              <label data-i18n="lbl_verify">مستوى التحقق (Pro):</label>
+              <select id="exec-verify">
+                <option value="final">final (افتراضي)</option>
+                <option value="checkpoints">checkpoints (المعالم)</option>
+                <option value="strict">strict (صارم جدا)</option>
+                <option value="off">off (معطل)</option>
+              </select>
+            </div>
+
+            <div class="tool-group">
+              <label data-i18n="lbl_locating">محرك الاستهداف:</label>
+              <select id="exec-backend">
+                <option value="auto">auto (Accessibility + Vision OCR)</option>
+                <option value="uiautomator">uiautomator (UIAutomator2)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- نافذة عرض خطوات الوكيل -->
+          <div id="stream-steps-view" class="stream-box">
+            <div class="empty-state" id="stream-empty" data-i18n="stream_empty_msg">
+              أدخل مهمة باللغة الطبيعية في شريط الأوامر بالأسفل أو اختر سيناريو جاهز لمشاهدة دورة (Observe → Think → Safety Check → Act) مباشرة.
+            </div>
+            <div id="agent-steps-list" class="steps-list"></div>
+          </div>
+
+          <!-- نافذة شجرة XML -->
+          <pre id="stream-xml-view" class="stream-box code-view" style="display: none;"></pre>
+
+          <!-- نافذة سجل Logcat -->
+          <pre id="stream-logcat-view" class="stream-box code-view" style="display: none;"></pre>
+
+          <!-- ④ Prompt Dock -->
+          <div class="prompt-dock">
+            <div class="preset-chips">
+              <button class="chip" onclick="fillPreset('battery')" data-i18n="preset_battery">🔋 فحص نسبة البطارية</button>
+              <button class="chip" onclick="fillPreset('flutter')" data-i18n="preset_flutter">🛒 اختبار متجر Flutter وإتمام السلة</button>
+              <button class="chip" onclick="fillPreset('crossapp')" data-i18n="preset_crossapp">🗺️ سيناريو مشترك (Maps ← YouTube)</button>
+            </div>
+            <div class="prompt-input-row">
+              <input type="text" id="task-prompt" data-i18n-placeholder="prompt_placeholder" placeholder="اكتب مهمتك باللغة الطبيعية... مثال: افتح الإعدادات، انتقل إلى البطارية وتحقق من النسبة" />
+              <button class="btn-primary" id="run-btn" onclick="executeTask()">
+                <span>▶</span> <span data-i18n="btn_run">تشغيل المهمة</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ⑤ Task Queue & CLI Output -->
+        <div class="panel queue-panel">
+          <div class="panel-header">
+            <h2 data-i18n="panel_queue_title">📋 طابور المهام (FIFO Lock) والـ CLI</h2>
+            <button class="btn-secondary btn-xs" onclick="clearQueue()" data-i18n="btn_clear">مسح السجل</button>
+          </div>
+
+          <div class="mutex-status">
+            <span>🔒 DeviceExecutionLock:</span>
+            <strong id="lock-state">IDLE (متاح)</strong>
+          </div>
+
+          <div class="queue-list" id="task-queue-list"></div>
+
+          <div class="cli-preview-box">
+            <div class="cli-header">
+              <span>💻 Equivalent ARTEMIS CLI Command</span>
+              <button class="copy-btn" onclick="copyText('live-cli-cmd')" data-i18n="btn_copy">نسخ</button>
+            </div>
+            <pre id="live-cli-cmd">uv run artemis run "Open Settings, find Battery and tell me current level" --profile flash</pre>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==================== TAB 2: CONFIG & .ENV & MCP STUDIO ==================== -->
+    <section id="tab-config" class="tab-content">
+      <div class="config-grid">
+        <!-- إعداد مفتاح الذكاء الاصطناعي ومولد .env -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 data-i18n="cfg_env_title">🔑 إعدادات مزود الذكاء الاصطناعي ومولد ملف (.env)</h2>
+          </div>
+          <p class="panel-desc" data-i18n="cfg_env_desc">
+            أدخل مفتاح Gemini API المجاني (من Google AI Studio) لتفعيل التفكير الذكي الحقيقي داخل موقع CHIBANI LOL AI، وتوليد ملف .env جاهز لمستودعك.
+          </p>
+
+          <div class="form-group">
+            <label>Google Gemini API Key (مجاني عبر aistudio.google.com):</label>
+            <div class="input-with-btn">
+              <input type="password" id="cfg-gemini-key" placeholder="AIzaSy..." oninput="updateEnvPreview()" />
+              <button class="btn-primary" onclick="saveAndVerifyKey()" data-i18n="btn_save_key">حفظ وتفعيل</button>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>ADB_HOST:</label>
+              <input type="text" id="cfg-adb-host" value="127.0.0.1" oninput="updateEnvPreview()" />
+            </div>
+            <div class="form-group">
+              <label>ADB_PORT:</label>
+              <input type="text" id="cfg-adb-port" value="5037" oninput="updateEnvPreview()" />
+            </div>
+            <div class="form-group">
+              <label>ADB_DEVICE_SERIAL:</label>
+              <input type="text" id="cfg-adb-serial" placeholder="اختياري (مثال: emulator-5554)" oninput="updateEnvPreview()" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>ARTEMIS_DEFAULT_PROFILE:</label>
+              <select id="cfg-def-profile" onchange="updateEnvPreview()">
+                <option value="flash">flash</option>
+                <option value="pro">pro</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>ARTEMIS_HIERARCHY_BACKEND:</label>
+              <select id="cfg-backend" onchange="updateEnvPreview()">
+                <option value="auto">auto</option>
+                <option value="uiautomator">uiautomator</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <label class="toggle-control">
+              <input type="checkbox" id="cfg-auto-helper" checked onchange="updateEnvPreview()" />
+              <span>ARTEMIS_HELPER_AUTO_INSTALL=true</span>
+            </label>
+            <label class="toggle-control">
+              <input type="checkbox" id="cfg-keep-awake" checked onchange="updateEnvPreview()" />
+              <span>ARTEMIS_KEEP_DEVICE_AWAKE=true</span>
+            </label>
+          </div>
+
+          <div class="cli-preview-box">
+            <div class="cli-header">
+              <span>📄 ملف .env الجاهز</span>
+              <div>
+                <button class="copy-btn" onclick="copyText('env-output')" data-i18n="btn_copy">نسخ</button>
+                <button class="copy-btn" onclick="downloadEnvFile()" data-i18n="btn_download_env">تحميل .env</button>
+              </div>
+            </div>
+            <pre id="env-output"></pre>
+          </div>
+        </div>
+
+        <!-- مولد إعدادات MCP لبيئات البرمجة -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 data-i18n="cfg_mcp_title">🔌 مولد تكامل MCP مع محررات الأكواد الذكية (AI IDEs)</h2>
+          </div>
+          <p class="panel-desc" data-i18n="cfg_mcp_desc">
+            اختر محرر الأكواد الذي تستخدمه للحصول على أوامر التثبيت التلقائي وملف التكوين اليدوي ومواصفات أدوات الـ MCP الخمس.
+          </p>
+
+          <div class="form-group">
+            <label data-i18n="lbl_select_ide">اختر بيئة التطوير (IDE):</label>
+            <select id="cfg-ide-select" onchange="updateMcpPreview()">
+              <option value="all">جميع المحررات المدعومة (Install All)</option>
+              <option value="claude">Claude Code / Claude Desktop</option>
+              <option value="cursor">Cursor IDE</option>
+              <option value="antigravity">Google Antigravity / Jetski</option>
+              <option value="codex">OpenAI Codex CLI</option>
+              <option value="windsurf">Windsurf IDE</option>
+              <option value="vscode">VS Code / Cline / Roo Code</option>
+            </select>
+          </div>
+
+          <div class="cli-preview-box">
+            <div class="cli-header">
+              <span>⚡ أمر التثبيت التلقائي الموصى به</span>
+              <button class="copy-btn" onclick="copyText('mcp-cmd-output')" data-i18n="btn_copy">نسخ</button>
+            </div>
+            <pre id="mcp-cmd-output">uv run artemis mcp --install all</pre>
+          </div>
+
+          <div class="cli-preview-box">
+            <div class="cli-header">
+              <span>🛠️ إعداد JSON / TOML اليدوي لخادم MCP</span>
+              <button class="copy-btn" onclick="copyText('mcp-json-output')" data-i18n="btn_copy">نسخ</button>
+            </div>
+            <pre id="mcp-json-output"></pre>
+          </div>
+
+          <div class="mcp-tools-badges">
+            <span class="tool-badge">mobile_run_task</span>
+            <span class="tool-badge">mobile_manage_task</span>
+            <span class="tool-badge">mobile_get_device_state</span>
+            <span class="tool-badge">mobile_inspect_trace</span>
+            <span class="tool-badge">mobile_diagnose</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 3: DOCTOR & WEBUSB ==================== -->
+    <section id="tab-doctor" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <h2 data-i18n="doc_title">🩺 طبيب البيئة وفحص الجاهزية (CHIBANI LOL AI Doctor & WebUSB Probe)</h2>
+          <button class="btn-primary" onclick="runEnvironmentDoctor()" data-i18n="btn_run_doctor">🔍 بدء الفحص الشامل الآن</button>
+        </div>
+
+        <div class="doctor-grid" id="doctor-results">
+          <div class="doc-card">
+            <h3>🌐 Browser & WebUSB API</h3>
+            <p id="doc-webusb-status">اضغط على "بدء الفحص الشامل" للتحقق من دعم المتصفح للاتصال المباشر بالهاتف.</p>
+          </div>
+          <div class="doc-card">
+            <h3>🤖 Gemini AI Engine</h3>
+            <p id="doc-ai-status">جاهز للفحص (يدعم الوضع التفاعلي المدمج + مفتاح Gemini API المباشر).</p>
+          </div>
+          <div class="doc-card">
+            <h3>📱 Connected USB Devices</h3>
+            <p id="doc-device-status">لم يتم إقران جهاز عبر WebUSB بعد.</p>
+          </div>
+          <div class="doc-card">
+            <h3>⚡ Render Cloud Readiness</h3>
+            <p id="doc-render-status">100% متوافق مع استضافة Render المجانية (Zero-Cost Static / Blueprint).</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 4: ENGINEERING DOCS ==================== -->
+    <section id="tab-docs" class="tab-content">
+      <div class="panel docs-panel">
+        <h2 data-i18n="docs_header">📚 الدليل المرجعي الكامل لأوامر وخصائص Google ARTEMIS</h2>
+        <div class="docs-table-wrapper">
+          <table class="docs-table">
+            <thead>
+              <tr>
+                <th>المكون / الأمر</th>
+                <th>الكود / الصيغة</th>
+                <th>الشرح التقني</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>التشغيل الفوري</strong></td>
+                <td><code>./start.sh</code> أو <code>.\start.bat</code></td>
+                <td>يثبت Python uv و ADB و scrcpy و FFmpeg ويبني واجهة الويب على المنفذ 8000.</td>
+              </tr>
+              <tr>
+                <td><strong>تشغيل نمط Flash</strong></td>
+                <td><code>uv run artemis run "Task" --profile flash</code></td>
+                <td>حلقة سريعة (3-5 ثوانٍ للخطوة) بدون LangGraph للمهام المباشرة.</td>
+              </tr>
+              <tr>
+                <td><strong>تشغيل نمط Pro الصارم</strong></td>
+                <td><code>uv run artemis run "Task" --profile pro --verification-level strict</code></td>
+                <td>تخطيط متعدد الفروع مع تحقق قبل كل نقرة ومراجعة شاملة عبر Checker.</td>
+              </tr>
+              <tr>
+                <td><strong>إدارة المساعد (Helper)</strong></td>
+                <td><code>uv run artemis helper install | status | uninstall</code></td>
+                <td>التحكم بتطبيق Accessibility Helper المسؤول عن قراءة شجرة الواجهة بسرعة.</td>
+              </tr>
+              <tr>
+                <td><strong>التشغيل عن بُعد (SSH)</strong></td>
+                <td><code>ssh -L 8000:localhost:8000 user@host</code></td>
+                <td>تمرير منفذ واجهة الويب للتحكم بهاتف متصل بخادم سحابي أو جهاز بعيد.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <span>© 2026 <strong>CHIBANI LOL AI</strong> — Built by Lotfi Chibani | Powered by Google ARTEMIS Architecture & Free Render Cloud</span>
+  </footer>
+
+  <script src="i18n.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

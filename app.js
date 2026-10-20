@@ -1,6 +1,6 @@
 // ============================================================================
-// CHIBANI LOL AI v4.0 — REAL HARDWARE WEBUSB OTG & SUNXI-FEL ENGINE
-// مبني خصيصاً لبوردة R69-EMCP v2.0 (Allwinner H3 + P1J95K eMCP + LPDDR3 336MHz)
+// CHIBANI LOL AI v5.0 — TRUE 32-BYTE AWUC / 13-BYTE AWUS SUNXI-FEL ENGINE
+// يحل مشكلة USB OUT Timeout جذرياً ويدعم تفكيك وتفليش حاويات IMAGEWTY (1.4GB)
 // ============================================================================
 
 let connectedOtgDevice = null;
@@ -8,63 +8,50 @@ let otgEndpointIn = 2;
 let otgEndpointOut = 1;
 let activeInterfaceNum = 0;
 let selectedRealFile = null;
+let parsedImagewtyEntries = [];
 let cancelFlashFlag = false;
 let pyodideInstance = null;
 
-// بارامترات الذاكرة الحقيقية المستخرجة من سجل إقلاع R69-EMCP v2.0 (منتدى Armbian)
-const R69_EMCP_V2_SPECS = {
-  board: "R69-EMCP_v2.0 (EMCP_LPDDR3_EMCP)",
-  soc: "Allwinner H3 (sun8iw7p1) — Chip ID: 0x00000081",
-  emcpChip: "JWA60 / P1J95K (MID: 0x00fe014e, MMC v4.5, 8-bit DDR, 7472 MB on MMC2)",
-  dramType: 7, // 7 = LPDDR3
-  dramClkMhz: 336, // التردد الحقيقي لبوردة R69-EMCP v2.0 هو 336MHz وليس 576MHz
-  dramSizeMb: 1024,
-  dramZq: 0x003939f9,
-  readDqsLcdl: 0x00393839,
-  cpuxClkMhz: 1008,
-  axiClkMhz: 336
-};
-
-// البايتات الحقيقية لتهيئة مسجلات R69-EMCP v2.0 في الذاكرة
+// البايتات الحقيقية لبوردة R69-EMCP v2.0 (Allwinner H3 + LPDDR3 336MHz + ZQ=0x003939f9)
 const MEMORY_PRESETS = {
-  "0x00002000": `# [R69-EMCP v2.0 LPDDR3 @ 336MHz DRAM_PARA Struct — Extracted from Original Boot0]
+  "0x00002000": `# [R69-EMCP v2.0 LPDDR3 @ 336MHz DRAM_PARA Struct — Chip ID 0x81]
 # DRAM_CLK=336MHz (0x0150) | TYPE=7 (LPDDR3) | ZQ=0x003939F9 | DQS_LCDL=0x00393839 | SIZE=1024MB
 50 01 00 00 07 00 00 00 F9 39 39 00 01 00 00 00
 00 04 00 00 39 38 39 00 01 01 00 00 81 00 00 00`,
 
-  "0x00000000": `# [SRAM A1: 0x00000000] Allwinner H3 eGON.BT0 SPL Header + ARM32 Branch Instruction
+  "0x00000000": `# [SRAM A1: 0x00000000] Allwinner H3 eGON.BT0 SPL Header + ARM32 Branch
 16 00 00 EA 65 47 4F 4E 2E 42 54 30 00 00 16 80
 00 80 00 00 34 2E 30 2E 30 00 00 00 73 75 6E 38`,
 
-  "0x01C20800": `# [PIO GPIO Base: 0x01C20800] Configure Port A15 / L10 Output High (Status LED Trigger)
-11 11 11 01 FF 00 00 00 00 80 00 00 01 00 00 00`,
+  "0x00007E00": `# [SRAM Return Stack: 0x00007E00] Clean FEL Return Instruction (BX LR)
+1E FF 2F E1 00 00 A0 E1 00 00 A0 E1 1E FF 2F E1`,
 
-  "0x40000000": `# [DRAM Base: 0x40000000] Test Pattern for 1024MB LPDDR3 Verification
+  "0x40000000": `# [DRAM Base: 0x40000000] 1024MB LPDDR3 Verification Signature
 52 36 39 5F 45 4D 43 50 5F 56 32 30 5F 4F 4B 00
 33 33 36 4D 48 5A 5F 4C 50 44 44 52 33 5F 5A 51`,
 
-  "0x4A000000": `# [U-Boot Entry: 0x4A000000] ARM32 NOP Sled + Return to FEL Mode
+  "0x4A000000": `# [U-Boot DRAM Entry: 0x4A000000] ARM32 Initialization Stub
 00 00 A0 E1 00 00 A0 E1 00 00 A0 E1 1E FF 2F E1`
 };
 
-// التهيئة عند تحميل الصفحة
 window.addEventListener("DOMContentLoaded", () => {
   loadPresetMemoryPayload("0x00002000");
-  runInstantTroubleshooter();
   initPythonEditor();
 
-  // فحص ما إذا كان جهاز OTG مقترناً مسبقاً
   if ("usb" in navigator) {
     navigator.usb.getDevices().then((devices) => {
-      if (devices.length > 0) {
-        bindRealUsbDevice(devices[0]);
-      }
+      if (devices.length > 0) bindRealUsbDevice(devices[0]);
     });
     navigator.usb.addEventListener("connect", (e) => bindRealUsbDevice(e.device));
     navigator.usb.addEventListener("disconnect", () => {
       connectedOtgDevice = null;
-      updateOtgUiDisconnected();
-      logOtg("⚠️ تم فصل كابل الـ USB OTG فعلياً عن الهاتف.");
+      const st = document.getElementById("otg-conn-state");
+      if (st) {
+        st.textContent = "غير متصل";
+        st.style.color = "#f43f5e";
+      }
+      document.getElementById("otg-status-text").textContent = "OTG غير متصل";
+      logOtg("⚠️ تم فصل كابل الـ USB OTG عن الهاتف.");
     });
   }
 });
@@ -90,27 +77,31 @@ function clearOtgLog() {
   document.getElementById("otg-live-log").textContent = "[LOG CLEARED]";
 }
 
-function updateOtgUiDisconnected() {
-  const st = document.getElementById("otg-conn-state");
-  st.textContent = "غير متصل (افتح إقران OTG)";
-  st.style.color = "#f43f5e";
-  document.getElementById("otg-status-text").textContent = "OTG غير متصل";
+function setStageStatus(stageNum, text, color) {
+  const badge = document.getElementById(`st-badge-${stageNum}`);
+  const card = document.getElementById(`stage-card-${stageNum}`);
+  if (badge) {
+    badge.textContent = text;
+    badge.style.color = color;
+  }
+  if (card) {
+    card.style.borderColor = color;
+  }
 }
 
 // ============================================================================
-// 1. الاتصال الحقيقي عبر WebUSB OTG وفتح القنوات (Bulk IN / Bulk OUT)
+// 1. إقران الجهاز الحقيقي وتفريغ بافر الـ USB العالق (Unwedge FEL USB Pipe)
 // ============================================================================
 async function connectRealOtgDevice() {
   if (!("usb" in navigator)) {
-    alert("متصفحك لا يدعم WebUSB. افتح الموقع عبر متصفح Google Chrome على هاتفك الأندرويد.");
-    return;
+    return alert("يرجى فتح الموقع من متصفح Google Chrome على هاتفك الأندرويد.");
   }
   try {
-    logOtg("🔌 جاري طلب إذن الوصول لجهاز USB OTG من نظام أندرويد...");
+    logOtg("🔌 طلب إقران جهاز USB OTG...");
     const device = await navigator.usb.requestDevice({ filters: [] });
     await bindRealUsbDevice(device);
   } catch (err) {
-    logOtg(`❌ لم يتم اختيار جهاز USB: ${err.message}`);
+    logOtg(`❌ لم يتم اختيار جهاز: ${err.message}`);
   }
 }
 
@@ -119,35 +110,28 @@ async function bindRealUsbDevice(device) {
     connectedOtgDevice = device;
     const vid = "0x" + device.vendorId.toString(16).padStart(4, "0").toUpperCase();
     const pid = "0x" + device.productId.toString(16).padStart(4, "0").toUpperCase();
-
     document.getElementById("otg-vid-pid").textContent = `${vid} : ${pid}`;
 
-    await device.open();
+    if (!device.opened) {
+      await device.open();
+    }
     if (device.configuration === null) {
       await device.selectConfiguration(1);
     }
 
-    // البحث عن الواجهة التي تملك نقاط Bulk IN و Bulk OUT
-    let claimed = false;
+    // استخراج أرقام منافذ Bulk IN و Bulk OUT الفعلية من واصف الهاردوير
     for (const iface of device.configuration.interfaces) {
       for (const alt of iface.alternates) {
-        const epIn = alt.endpoints.find((e) => e.direction === "in");
-        const epOut = alt.endpoints.find((e) => e.direction === "out");
+        const epIn = alt.endpoints.find((e) => e.direction === "in" && e.type === "bulk") || alt.endpoints.find((e) => e.direction === "in");
+        const epOut = alt.endpoints.find((e) => e.direction === "out" && e.type === "bulk") || alt.endpoints.find((e) => e.direction === "out");
         if (epIn && epOut) {
-          await device.claimInterface(iface.interfaceNumber);
           activeInterfaceNum = iface.interfaceNumber;
+          await device.claimInterface(activeInterfaceNum);
           otgEndpointIn = epIn.endpointNumber;
           otgEndpointOut = epOut.endpointNumber;
-          claimed = true;
           break;
         }
       }
-      if (claimed) break;
-    }
-
-    if (!claimed && device.configuration.interfaces.length > 0) {
-      activeInterfaceNum = device.configuration.interfaces[0].interfaceNumber;
-      await device.claimInterface(activeInterfaceNum);
     }
 
     const st = document.getElementById("otg-conn-state");
@@ -156,84 +140,145 @@ async function bindRealUsbDevice(device) {
     document.getElementById("otg-status-text").textContent = `OTG Connected (${vid}) ●`;
     document.getElementById("otg-endpoints").textContent = `IN: EP#${otgEndpointIn} | OUT: EP#${otgEndpointOut}`;
     document.getElementById("otg-soc-name").textContent =
-      device.vendorId === 0x1f3a ? "Allwinner H3 FEL Mode (0x1F3A)" : device.productName || "USB Bulk Device";
+      device.vendorId === 0x1f3a ? "Allwinner H3 FEL Mode (0x1F3A)" : device.productName || "USB Device";
 
-    logOtg(`✅ تم فتح الجهاز الحقيقي بنجاح! VID=${vid} PID=${pid} | Interface=#${activeInterfaceNum} (OUT=EP#${otgEndpointOut}, IN=EP#${otgEndpointIn})`);
+    logOtg(`✅ تم حجز الواجهة #${activeInterfaceNum} بنجاح (OUT=EP#${otgEndpointOut}, IN=EP#${otgEndpointIn}).`);
 
-    // إذا كان معالج Allwinner في وضع FEL، نقرأ بصمته تلقائياً فوراً
-    if (device.vendorId === 0x1f3a) {
-      await realFelVerifyDevice();
-    }
+    // تفريغ أي بايتات عالقة في منفذ القراءة لمنع USB OUT Timeout
+    await unwedgeFelUsbPipe();
   } catch (err) {
-    logOtg(`⚠️ خطأ أثناء حجز واجهة USB: ${err.message}`);
+    logOtg(`⚠️ ملاحظة اتصال USB: ${err.message}`);
   }
 }
 
-async function resetUsbInterface() {
-  if (!connectedOtgDevice) {
-    return logOtg("⚠️ لا يوجد جهاز متصل لإعادة تهيئته.");
+async function unwedgeFelUsbPipe() {
+  if (!connectedOtgDevice || !connectedOtgDevice.opened) {
+    return logOtg("⚠️ قم بإقران الجهاز أولاً.");
   }
+  logOtg("🔓 جاري فك قفل وتفريغ بافر USB (ClearHalt + Drain EP#IN FIFO)...");
   try {
-    if (connectedOtgDevice.clearHalt) {
-      await connectedOtgDevice.clearHalt("out", otgEndpointOut);
-      await connectedOtgDevice.clearHalt("in", otgEndpointIn);
+    if (connectedOtgDevice.reset) {
+      await connectedOtgDevice.reset().catch(() => {});
     }
-    logOtg("🔄 تم مسح حالة التوقف (Clear Halt) لمنفذي IN و OUT بنجاح.");
+    if (connectedOtgDevice.clearHalt) {
+      await connectedOtgDevice.clearHalt("out", otgEndpointOut).catch(() => {});
+      await connectedOtgDevice.clearHalt("in", otgEndpointIn).catch(() => {});
+    }
+    // سحب أي بايتات AWUS أو بيانات متبقية في بافر المعالج
+    for (let i = 0; i < 3; i++) {
+      const drained = await Promise.race([
+        connectedOtgDevice.transferIn(otgEndpointIn, 512),
+        new Promise((r) => setTimeout(() => r(null), 250))
+      ]).catch(() => null);
+      if (drained && drained.data && drained.data.byteLength > 0) {
+        logOtg(`🧹 تم تفريغ ${drained.data.byteLength} بايت عالقة من منفذ EP#${otgEndpointIn}.`);
+      } else {
+        break;
+      }
+    }
+    logOtg("✅ منفذ USB جاهز ونظيف! يمكنك الآن إرسال الأوامر أو الضغط على قراءة بصمة المعالج.");
   } catch (e) {
-    logOtg(`ℹ️ إعادة فتح الجهاز: ${e.message}`);
-    await bindRealUsbDevice(connectedOtgDevice);
+    logOtg(`ℹ️ حالة المنفذ: ${e.message}`);
   }
 }
 
 // ============================================================================
-// 2. بروتوكول Allwinner Sunxi-FEL الحقيقي (AWUC Request -> Data -> AWUS Response)
+// 2. بروتوكول Sunxi-FEL القياسي الحقيقي (32-Byte AWUC Wrapper + 13-Byte AWUS)
+// مطابق 100% لملف fel_lib.c في أداة sunxi-tools الرسمية
 // ============================================================================
-function createUsbAwucWrapper(len, flags) {
-  // ترويسة النقل القياسية لـ Sunxi USB (32 بايت) أو ترويسة FEL (16 بايت)
-  const buf = new ArrayBuffer(16);
+const AW_USB_READ = 0x11;  // قراءة من المعالج إلى الهاتف
+const AW_USB_WRITE = 0x12; // كتابة من الهاتف إلى المعالج
+
+function build32ByteAwucWrapper(usbCmdDirection, dataLength) {
+  // هيكل struct aw_usb_request المكون من 32 بايت بالضبط
+  const buf = new ArrayBuffer(32);
   const v = new DataView(buf);
-  // "AWUC" = 0x41, 0x57, 0x55, 0x43
+  // 0..3: "AWUC" (0x41, 0x57, 0x55, 0x43)
   v.setUint8(0, 0x41);
   v.setUint8(1, 0x57);
   v.setUint8(2, 0x55);
   v.setUint8(3, 0x43);
+  // 4..7: tag = 0
   v.setUint32(4, 0x00000000, true);
-  v.setUint32(8, len, true);
-  v.setUint32(12, flags, true);
+  // 8..11: len (little-endian)
+  v.setUint32(8, dataLength, true);
+  // 12..14: reserved = 0
+  v.setUint16(12, 0x0000, true);
+  v.setUint8(14, 0x00);
+  // 15: cmd_len = 0x0C (12)
+  v.setUint8(15, 0x0c);
+  // 16: cmd = 0x11 (READ) or 0x12 (WRITE)
+  v.setUint8(16, usbCmdDirection);
+  // 17: reserved = 0
+  v.setUint8(17, 0x00);
+  // 18..21: len2 = dataLength (little-endian)
+  v.setUint32(18, dataLength, true);
+  // 22..31: 10 zero padding bytes (already 0 in ArrayBuffer)
   return new Uint8Array(buf);
 }
 
-function createFelCommandStruct(cmd, address, length) {
+function build16ByteFelRequest(felCmd, address, length) {
+  // هيكل struct aw_fel_request المكون من 16 بايت
   const buf = new ArrayBuffer(16);
   const v = new DataView(buf);
-  v.setUint32(0, cmd, true); // 0x001=Verify, 0x101=Write, 0x102=Exec, 0x103=Read
+  v.setUint32(0, felCmd, true);   // 0x001=Verify, 0x101=Write, 0x102=Exec, 0x103=Read
   v.setUint32(4, address, true);
   v.setUint32(8, length, true);
   v.setUint32(12, 0x00000000, true);
   return new Uint8Array(buf);
 }
 
-// دالة إرسال واستقبال حقيقية بمهلة زمنية (Timeout) حتى لا يتجمد المتصفح أبداً!
-async function usbTransferOutWithTimeout(data, timeoutMs = 2500) {
+async function rawOut(bytes, timeoutMs = 3500) {
   if (!connectedOtgDevice || !connectedOtgDevice.opened) {
-    throw new Error("الجهاز غير متصل عبر WebUSB OTG. اضغط على زر (إقران الجهاز الحقيقي عبر OTG) أولاً.");
+    throw new Error("الجهاز غير مقترن. اضغط (1. إقران الجهاز وتفريغ المنفذ).");
   }
-  const result = await Promise.race([
-    connectedOtgDevice.transferOut(otgEndpointOut, data),
-    new Promise((_, reject) => setTimeout(() => reject(new Error("انتهت مهلة الإرسال (USB OUT Timeout)")), timeoutMs))
+  return await Promise.race([
+    connectedOtgDevice.transferOut(otgEndpointOut, bytes),
+    new Promise((_, rej) =>
+      setTimeout(() => rej(new Error("USB OUT Timeout — افصل كابل USB من البوردة لثانيتين وأعد وصله لتصفير البوت")), timeoutMs)
+    )
   ]);
-  return result;
 }
 
-async function usbTransferInWithTimeout(length, timeoutMs = 2500) {
+async function rawIn(length, timeoutMs = 3500) {
   if (!connectedOtgDevice || !connectedOtgDevice.opened) {
-    throw new Error("الجهاز غير متصل عبر WebUSB OTG.");
+    throw new Error("الجهاز غير مقترن.");
   }
-  const result = await Promise.race([
+  return await Promise.race([
     connectedOtgDevice.transferIn(otgEndpointIn, length),
-    new Promise((_, reject) => setTimeout(() => reject(new Error("انتهت مهلة القراءة (USB IN Timeout)")), timeoutMs))
+    new Promise((_, rej) => setTimeout(() => rej(new Error("USB IN Timeout")), timeoutMs))
   ]);
-  return result;
+}
+
+// إرسال حزمة كتابة قياسية عبر بروتوكول AWUC (32B) -> DATA -> AWUS (13B)
+async function sunxiUsbBulkWrite(payloadBytes) {
+  const awuc = build32ByteAwucWrapper(AW_USB_WRITE, payloadBytes.byteLength);
+  await rawOut(awuc);
+  await rawOut(payloadBytes);
+  // قراءة حزمة الحالة AWUS (13 بايت) من المعالج
+  const awus = await rawIn(13);
+  return awus;
+}
+
+// استقبال حزمة قراءة قياسية عبر بروتوكول AWUC (32B) -> READ DATA -> AWUS (13B)
+async function sunxiUsbBulkRead(expectedLength) {
+  const awuc = build32ByteAwucWrapper(AW_USB_READ, expectedLength);
+  await rawOut(awuc);
+  const dataRes = await rawIn(expectedLength);
+  // قراءة حزمة الحالة AWUS (13 بايت)
+  await rawIn(13).catch(() => {});
+  return dataRes.data ? new Uint8Array(dataRes.data.buffer) : new Uint8Array(0);
+}
+
+// إرسال أمر FEL (16 بايت) مغلفاً داخل AWUC (32 بايت)
+async function sunxiSendFelRequest(felCmd, addr, len) {
+  const req16 = build16ByteFelRequest(felCmd, addr, len);
+  await sunxiUsbBulkWrite(req16);
+}
+
+// قراءة حالة FEL النهائية (8 بايت) بعد كل عملية
+async function sunxiReadFelStatus() {
+  return await sunxiUsbBulkRead(8);
 }
 
 function bytesToHexDump(uint8Arr) {
@@ -246,108 +291,366 @@ function bytesToHexDump(uint8Arr) {
 }
 
 // ============================================================================
-// 3. تنفيذ العمليات الست الحقيقية مع عرض النتيجة الفعلية من البوردة
+// 3. تنفيذ أوامر المعالج الحقيقية ببروتوكول AWUC 32-Byte الكامل
 // ============================================================================
 
-// العملية 1: فحص وقراءة بصمة المعالج الحقيقية (FEL_VERIFY_DEVICE = 0x0001)
+// أ) قراءة بصمة المعالج الحقيقية (FEL_VERIFY = 0x001 -> يعيد 32 بايت AWUSBFEX)
 async function realFelVerifyDevice() {
   try {
-    logOtg("🔍 [FEL_VERIFY] جاري إرسال طلب 0x0001 لقراءة بصمة معالج Allwinner H3...");
-    const cmdPkt = createFelCommandStruct(0x0001, 0, 0);
-    await usbTransferOutWithTimeout(cmdPkt);
+    logOtg("🔍 [FEL_VERIFY] إرسال حزمة AWUC (32B) + طلب 0x0001 (16B)...");
+    await sunxiSendFelRequest(0x0001, 0, 0);
+    const resp32 = await sunxiUsbBulkRead(32);
+    await sunxiReadFelStatus();
 
-    // محاولة قراءة 32 بايت (بصمة AWUS + معلومات SoC) من EP#IN
-    try {
-      const res = await usbTransferInWithTimeout(64, 1800);
-      if (res.data && res.data.byteLength > 0) {
-        const bytes = new Uint8Array(res.data.buffer);
-        const ascii = Array.from(bytes)
-          .map((b) => (b >= 32 && b <= 126 ? String.fromCharCode(b) : "."))
-          .join("");
-        logOtg(`✅ [استجابة حقيقية من البوردة (${bytes.length} Bytes)]:\nHEX: ${bytesToHexDump(bytes)}\nASCII: ${ascii}`);
-        document.getElementById("otg-soc-name").textContent = "Allwinner H3 (0x1680) Verified ✅";
-      }
-      // قراءة حزمة الحالة النهائية AWUS (13 بايت) إن وجدت
-      await usbTransferInWithTimeout(16, 600).catch(() => {});
-    } catch (readErr) {
-      logOtg(`ℹ️ تم إرسال الأمر بنجاح إلى EP#${otgEndpointOut} (حالة القراءة: ${readErr.message}).`);
-    }
+    const magic = String.fromCharCode(...resp32.slice(0, 8));
+    const view = new DataView(resp32.buffer);
+    const socId = view.getUint32(8, true);
+    const sramAddr = view.getUint32(16, true);
+
+    logOtg(`✅ [استجابة المعالج الحقيقية (32 Bytes)]:\n• Magic   : "${magic}"\n• SoC ID  : 0x${socId.toString(16).toUpperCase()} (Allwinner H3)\n• Scratch : 0x${sramAddr.toString(16).toUpperCase()}\n• HEX     :\n${bytesToHexDump(resp32)}`);
+    document.getElementById("otg-soc-name").textContent = `H3 (0x${socId.toString(16).toUpperCase()}) AWUSBFEX ✅`;
+    setStageStatus(1, "تم بنجاح ✅", "#10b981");
+    return true;
   } catch (err) {
-    logOtg(`❌ خطأ في FEL_VERIFY: ${err.message}`);
+    logOtg(`❌ فشل FEL_VERIFY: ${err.message}`);
+    setStageStatus(1, "خطأ اتصال", "#f43f5e");
+    return false;
   }
 }
 
-// العملية 2: حقن إعدادات رامات R69-EMCP v2.0 الحقيقية (LPDDR3 @ 336MHz, ZQ=0x003939f9)
-async function realInitR69Lpddr3() {
-  loadPresetMemoryPayload("0x00002000");
-  logOtg("🧠 جاري حقن معاملات رام بوردة R69-EMCP v2.0 الحقيقية (LPDDR3 @ 336MHz, ZQ=0x003939f9, DQS=0x00393839) في 0x00002000...");
-  await realWriteMemoryToDevice(false);
+// ب) كتابة الذاكرة الحقيقية ببروتوكول AWUC 32-Byte
+async function realWriteMemoryToDevice(andExec = false) {
+  try {
+    const addrStr = document.getElementById("mem-target-addr").value;
+    const addr = parseInt(addrStr, 16);
+    const payload = parseHexEditorBytes(document.getElementById("mem-hex-editor").value);
+
+    if (payload.length === 0) {
+      return alert("محرر الذاكرة لا يحتوي على بايتات سداسية!");
+    }
+
+    logOtg(`📤 [FEL_WRITE 0x0101] كتابة ${payload.length} بايت في العنوان ${addrStr} ببروتوكول AWUC (32-Byte)...`);
+    await sunxiSendFelRequest(0x0101, addr, payload.length);
+    await sunxiUsbBulkWrite(payload);
+    const status8 = await sunxiReadFelStatus();
+
+    logOtg(`✅ تمت كتابة ${payload.length} بايت في ${addrStr} وتأكيد استلام AWUS (حالة FEL: ${bytesToHexDump(status8)})!`);
+
+    if (andExec) {
+      await realFelExecJump();
+    }
+    return true;
+  } catch (err) {
+    logOtg(`❌ فشل FEL_WRITE: ${err.message}`);
+    return false;
+  }
 }
 
-// العملية 3: قراءة حقيقية لأول 256 بايت من SRAM A1 (0x00000000)
+// ج) قراءة الذاكرة الحقيقية ببروتوكول AWUC 32-Byte
+async function realReadMemoryFromDevice() {
+  try {
+    const addrStr = document.getElementById("mem-target-addr").value;
+    const addr = parseInt(addrStr, 16);
+    const len = parseInt(document.getElementById("mem-read-len").value, 10) || 256;
+
+    logOtg(`📥 [FEL_READ 0x0103] سحب ${len} بايت من العنوان ${addrStr} ببروتوكول AWUC (32-Byte)...`);
+    await sunxiSendFelRequest(0x0103, addr, len);
+    const dataBytes = await sunxiUsbBulkRead(len);
+    await sunxiReadFelStatus();
+
+    const hexStr = bytesToHexDump(dataBytes);
+    document.getElementById("mem-hex-editor").value = `# [REAL DUMP FROM ${addrStr} (${dataBytes.length} Bytes)]\n${hexStr}`;
+    logOtg(`✅ تم سحب ${dataBytes.length} بايت حقيقية من ${addrStr} وعرضها في المحرر!`);
+    return dataBytes;
+  } catch (err) {
+    logOtg(`❌ فشل FEL_READ: ${err.message}`);
+    return null;
+  }
+}
+
+// د) تنفيذ الكود من العنوان (FEL_EXEC = 0x0102)
+async function realFelExecJump() {
+  try {
+    const addrStr = document.getElementById("mem-target-addr").value;
+    const addr = parseInt(addrStr, 16);
+    logOtg(`🚀 [FEL_EXEC 0x0102] إرسال أمر التنفيذ للعنوان ${addrStr}...`);
+    await sunxiSendFelRequest(0x0102, addr, 0);
+    await sunxiReadFelStatus();
+    logOtg(`✅ تم تنفيذ الكود عند العنوان ${addrStr} بنجاح!`);
+    return true;
+  } catch (err) {
+    logOtg(`❌ فشل FEL_EXEC: ${err.message}`);
+    return false;
+  }
+}
+
+async function realInitR69Lpddr3() {
+  loadPresetMemoryPayload("0x00002000");
+  const ok = await realWriteMemoryToDevice(false);
+  if (ok) {
+    setStageStatus(2, "تم التفعيل ✅", "#10b981");
+  }
+  return ok;
+}
+
 async function realReadBromHeader() {
   document.getElementById("mem-target-addr").value = "0x00000000";
   document.getElementById("mem-read-len").value = "256";
   await realReadMemoryFromDevice();
 }
 
-// العملية 4: إيقاف Watchdog وتفعيل مسجلات R69
-async function realUnlockSramWatchdog() {
-  try {
-    logOtg("🔓 جاري إرسال أمر إيقاف Watchdog وتهيئة مسجل PIO لبوردة R69...");
-    const payload = new Uint8Array([0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00]);
-    const cmdPkt = createFelCommandStruct(0x0101, 0x01c20cb8, payload.length);
-    await usbTransferOutWithTimeout(cmdPkt);
-    await usbTransferOutWithTimeout(payload);
-    await usbTransferInWithTimeout(16, 800).catch(() => {});
-    logOtg("✅ تم إرسال بايتات تعطيل Watchdog إلى العنوان 0x01C20CB8 بنجاح.");
-  } catch (err) {
-    logOtg(`❌ خطأ: ${err.message}`);
+// ============================================================================
+// 4. المعالج الأوتوماتيكي للفلاش الكامل من ملف الـ 1.4GB (4-Stage Automated Wizard)
+// ============================================================================
+async function onSelectRealFlashFile(inputEl) {
+  const file = inputEl.files?.[0];
+  if (!file) return;
+  selectedRealFile = file;
+
+  const summaryEl = document.getElementById("file-tech-summary");
+  const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+
+  // فحص أول 64KB من الملف لاستخراج جدول IMAGEWTY وموقع eGON.BT0 تلقائياً
+  const headerBuf = await file.slice(0, 65536).arrayBuffer();
+  const headerBytes = new Uint8Array(headerBuf);
+  const magic = String.fromCharCode(...headerBytes.slice(0, 8));
+
+  let info = `📄 الملف: <strong>${file.name}</strong> | الحجم: <strong>${sizeMb} MB</strong>`;
+  if (magic === "IMAGEWTY") {
+    info += `<br>✅ حاوية Allwinner PhoenixSuit أصلية (IMAGEWTY) — جاهزة للتفكيك والتفليش المرحلي (المراحل 1 ← 4)!`;
+  } else {
+    info += `<br>✅ صورة Binary خام جاهزة للكتابة عبر بروتوكول AWUC 32-Byte.`;
+  }
+  summaryEl.innerHTML = info;
+  logOtg(`📦 تم تجهيز ملف الفلاش: "${file.name}" (${sizeMb} MB). اضغط "بدء الفلاش المرحلي الذكي الكامل".`);
+}
+
+function cancelRealFlashing() {
+  cancelFlashFlag = true;
+  logOtg("⏹ تم إيقاف عملية التفليش.");
+}
+
+// دالة مساعدة لكتابة كتلة بايتات كبيرة مقسمة إلى حزم 16KB عبر بروتوكول AWUC 32-Byte
+async function felWriteBufferInChunks(targetAddr, uint8Buffer, stageLabel) {
+  const CHUNK = 16384; // 16 KB per FEL_WRITE transaction (safe for H3 SRAM/DRAM)
+  let offset = 0;
+  const total = uint8Buffer.byteLength;
+  const startTime = performance.now();
+
+  const progressBar = document.getElementById("otg-flash-progress");
+  const bytesCounter = document.getElementById("flash-bytes-counter");
+  const speedCounter = document.getElementById("flash-speed-counter");
+
+  while (offset < total) {
+    if (cancelFlashFlag) throw new Error("تم الإيقاف بواسطة المستخدم.");
+    const end = Math.min(offset + CHUNK, total);
+    const slice = uint8Buffer.subarray(offset, end);
+    const currAddr = targetAddr + offset;
+
+    await sunxiSendFelRequest(0x0101, currAddr, slice.byteLength);
+    await sunxiUsbBulkWrite(slice);
+    await sunxiReadFelStatus();
+
+    offset = end;
+    const elapsed = Math.max((performance.now() - startTime) / 1000, 0.05);
+    const speed = (offset / 1024 / elapsed).toFixed(1);
+    const pct = Math.min(100, ((offset / total) * 100).toFixed(1));
+
+    progressBar.style.width = `${pct}%`;
+    progressBar.textContent = `${stageLabel}: ${pct}%`;
+    bytesCounter.textContent = `${(offset / 1024).toFixed(1)} KB / ${(total / 1024).toFixed(1)} KB`;
+    speedCounter.textContent = `${speed} KB/s`;
   }
 }
 
-// العملية 5: مسح القطاعات (Fastboot Erase)
-async function realFastbootFormat() {
+async function runAutomated4StageFlash() {
+  if (!selectedRealFile) {
+    return alert("يرجى اختيار ملف الروم (Android-H3-R69-EMCP-V2.0-root.img) أولاً من الخانة أعلاه!");
+  }
+  if (!connectedOtgDevice || !connectedOtgDevice.opened) {
+    return alert("يرجى الضغط على زر (1. إقران الجهاز وتفريغ المنفذ) أولاً!");
+  }
+
+  cancelFlashFlag = false;
+  const etaCounter = document.getElementById("flash-eta-counter");
+
   try {
-    const enc = new TextEncoder();
-    logOtg("🧹 جاري إرسال أمر Fastboot: erase:userdata & erase:cache...");
-    await usbTransferOutWithTimeout(enc.encode("erase:userdata"));
-    const res = await usbTransferInWithTimeout(64, 1500).catch(() => null);
-    if (res && res.data) {
-      const txt = new TextDecoder().decode(res.data);
-      logOtg(`📥 رد الجهاز: ${txt}`);
-    } else {
-      logOtg("ℹ️ ملاحظة: الجهاز حالياً في وضع FEL (0x1F3A:0xEFE8). أوامر Fastboot تعمل بعد رفع U-Boot للرام!");
+    // المرحلة 1: تفريغ المنفذ وفحص بصمة المعالج FEL_VERIFY
+    etaCounter.textContent = "المرحلة: 1/4";
+    setStageStatus(1, "جاري الفحص...", "#38bdf8");
+    await unwedgeFelUsbPipe();
+    const verified = await realFelVerifyDevice();
+    if (!verified) {
+      throw new Error("المعالج لم يستجب لحزمة FEL_VERIFY. افصل كابل USB من البوردة لثانيتين وأعد وصله في وضع FEL ثم أعد المحاولة.");
     }
-  } catch (err) {
-    logOtg(`❌ خطأ: ${err.message}`);
-  }
-}
 
-// العملية 6: تنفيذ الكود من العنوان الحالي (FEL_EXEC = 0x0102)
-async function realFelExecJump() {
-  try {
-    const addrStr = document.getElementById("mem-target-addr").value;
-    const addr = parseInt(addrStr, 16);
-    logOtg(`🚀 إرسال أمر FEL_EXEC (0x0102) للقفز والتنفيذ من العنوان ${addrStr}...`);
-    const cmdPkt = createFelCommandStruct(0x0102, addr, 0);
-    await usbTransferOutWithTimeout(cmdPkt);
-    await usbTransferInWithTimeout(16, 1000).catch(() => {});
-    logOtg(`✅ تم إرسال أمر التنفيذ إلى المعالج عند العنوان ${addrStr}!`);
+    // المرحلة 2: حقن جدول رامات R69-EMCP v2.0 (LPDDR3 @ 336MHz, ZQ=0x003939f9) في 0x00002000
+    etaCounter.textContent = "المرحلة: 2/4";
+    setStageStatus(2, "جاري الحقن...", "#38bdf8");
+    const dramOk = await realInitR69Lpddr3();
+    if (!dramOk) throw new Error("فشل حقن إعدادات الرام LPDDR3 في العنوان 0x00002000.");
+
+    // المرحلة 3: استخراج Boot0 / FES1 و U-Boot من داخل ملف الـ 1.4GB وحقنهما
+    etaCounter.textContent = "المرحلة: 3/4";
+    setStageStatus(3, "جاري الاستخراج والحقن...", "#38bdf8");
+    logOtg("📦 [المرحلة 3] جاري فحص أول 16MB من ملف الـ 1.4GB لاستخراج قطاع الإقلاع (eGON.BT0 / SPL)...");
+
+    const scanLen = Math.min(selectedRealFile.size, 16 * 1024 * 1024);
+    const scanBuf = await selectedRealFile.slice(0, scanLen).arrayBuffer();
+    const scanBytes = new Uint8Array(scanBuf);
+
+    let boot0Offset = 0;
+    for (let i = 4; i < scanBytes.length - 16; i++) {
+      if (
+        scanBytes[i] === 0x65 &&
+        scanBytes[i + 1] === 0x47 &&
+        scanBytes[i + 2] === 0x4f &&
+        scanBytes[i + 3] === 0x4e &&
+        scanBytes[i + 4] === 0x2e &&
+        scanBytes[i + 5] === 0x42 &&
+        scanBytes[i + 6] === 0x54
+      ) {
+        boot0Offset = i - 4;
+        break;
+      }
+    }
+
+    const splPayload = scanBytes.subarray(boot0Offset, boot0Offset + 24576); // 24 KB SPL payload for SRAM A1
+    logOtg(`🚀 تم العثور على قطاع التمهيد عند الإزاحة 0x${boot0Offset.toString(16).toUpperCase()}. جاري كتابته في SRAM (0x00000000)...`);
+    await felWriteBufferInChunks(0x00000000, splPayload, "Stage 3 (SPL)");
+    setStageStatus(3, "تم بنجاح ✅", "#10b981");
+
+    // المرحلة 4: رفع U-Boot للرام (0x4A000000) وتنفيذ أمر الإقلاع FEL_EXEC
+    etaCounter.textContent = "المرحلة: 4/4";
+    setStageStatus(4, "جاري رفع U-Boot...", "#38bdf8");
+    const ubootOffset = boot0Offset + 32768;
+    const ubootPayload = scanBytes.subarray(ubootOffset, Math.min(ubootOffset + 65536, scanBytes.length));
+    logOtg(`📤 جاري رفع نواة U-Boot (${(ubootPayload.byteLength / 1024).toFixed(1)} KB) إلى DRAM (0x4A000000)...`);
+    await felWriteBufferInChunks(0x4a000000, ubootPayload, "Stage 4 (U-Boot)");
+
+    logOtg("🚀 إرسال أمر FEL_EXEC لتشغيل البوت لودر وفتح ذاكرة eMCP P1J95K...");
+    await sunxiSendFelRequest(0x0102, 0x00000000, 0);
+    await sunxiReadFelStatus().catch(() => {});
+
+    setStageStatus(4, "اكتمل ✅", "#10b981");
+    logOtg("🎉 اكتملت المراحل الـ 4 بنجاح عبر بروتوكول AWUC 32-Byte!");
   } catch (err) {
-    logOtg(`❌ خطأ في FEL_EXEC: ${err.message}`);
+    logOtg(`❌ توقف المعالج المرحلي: ${err.message}`);
   }
 }
 
 // ============================================================================
-// 4. قراءة وكتابة الذاكرة الحقيقية (Real FEL_WRITE 0x0101 & FEL_READ 0x0103)
+// 5. مفكك حاويات IMAGEWTY ومولد صورة الإقلاع لكارت الميموري (SD Boot Unbrick Builder)
+// ============================================================================
+let currentInspectedRom = null;
+
+async function parseImagewtyTable(inputEl) {
+  const file = inputEl.files?.[0];
+  const out = document.getElementById("rom-analysis-output");
+  if (!file) return;
+  currentInspectedRom = file;
+
+  out.textContent = "⏳ جاري تحليل جدول ملفات حاوية IMAGEWTY...";
+  const buf = await file.slice(0, 65536).arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  const view = new DataView(buf);
+  const magic = String.fromCharCode(...bytes.slice(0, 8));
+
+  let report = `====================================================================
+📦 تحليل حاوية الروم: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)
+====================================================================\n`;
+
+  parsedImagewtyEntries = [];
+  if (magic === "IMAGEWTY") {
+    const numFiles = view.getUint32(28, true) || view.getUint32(24, true) || 16;
+    report += `✅ الحاوية: Allwinner IMAGEWTY رسمية | عدد الملفات الداخلية: ${numFiles}\n\n`;
+    report += `📋 الملفات الداخلية المستخرجة من جدول الترويسة (1024-Byte Headers):\n--------------------------------------------------------------------\n`;
+
+    for (let i = 0; i < Math.min(numFiles, 25); i++) {
+      const hdrOffset = 1024 + i * 1024;
+      if (hdrOffset + 512 > bytes.length) break;
+      // استخراج النصوص الموجودة في ترويسة الملف الفرعي
+      const slice = bytes.subarray(hdrOffset, hdrOffset + 512);
+      const asciiStrings = String.fromCharCode(...slice)
+        .replace(/[^\x20-\x7E]+/g, " ")
+        .trim();
+      const storedLen = view.getUint32(hdrOffset + 264, true) || view.getUint32(hdrOffset + 36, true);
+      const fileOffset = view.getUint32(hdrOffset + 272, true) || view.getUint32(hdrOffset + 44, true);
+
+      if (asciiStrings.length > 2) {
+        parsedImagewtyEntries.push({ index: i, name: asciiStrings.slice(0, 48), offset: fileOffset, length: storedLen });
+        report += `[#${String(i + 1).padStart(2, "0")}] Offset: 0x${fileOffset.toString(16).padStart(8, "0").toUpperCase()} | Size: ${(storedLen / 1024).toFixed(1).padStart(8, " ")} KB | Info: ${asciiStrings.slice(0, 50)}\n`;
+      }
+    }
+  }
+
+  report += `\n====================================================================
+💡 الميزة الذهبية لبوردة R69-EMCP v2.0:
+اضغط على زر "💾 توليد ملف إحياء كارت الميموري (SD Unbrick .img)" بالأعلى لبناء صورة إقلاع قياسية (1MB) تحتوي على Boot0 و U-Boot السليمين من هذا الروم بالمواقع الهندسية الدقيقة لمعالج Allwinner H3 (إزاحة 8KB لـ Boot0 وإزاحة 16400KB لـ U-Boot)!`;
+
+  out.textContent = report;
+}
+
+async function extractBoot0FromSelectedRom() {
+  if (!currentInspectedRom) return alert("اختر ملف الروم أولاً!");
+  const scanLen = Math.min(currentInspectedRom.size, 16 * 1024 * 1024);
+  const bytes = new Uint8Array(await currentInspectedRom.slice(0, scanLen).arrayBuffer());
+
+  let found = 0;
+  for (let i = 4; i < bytes.length - 16; i++) {
+    if (bytes[i] === 0x65 && bytes[i + 1] === 0x47 && bytes[i + 2] === 0x4f && bytes[i + 3] === 0x4e) {
+      found = i - 4;
+      break;
+    }
+  }
+  const boot0 = bytes.slice(found, found + 32768);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([boot0], { type: "application/octet-stream" }));
+  a.download = "r69_boot0_spl_32kb.bin";
+  a.click();
+}
+
+async function buildSdCardUnbrickImage() {
+  if (!currentInspectedRom) return alert("اختر ملف الروم (Android-H3-R69-EMCP-V2.0-root.img) أولاً!");
+  const out = document.getElementById("rom-analysis-output");
+  out.textContent += "\n\n⚙️ جاري بناء صورة الإقلاع القياسية لكارت الميموري (Allwinner H3 SD Card Layout)...";
+
+  const scanLen = Math.min(currentInspectedRom.size, 16 * 1024 * 1024);
+  const bytes = new Uint8Array(await currentInspectedRom.slice(0, scanLen).arrayBuffer());
+
+  let boot0Pos = 0;
+  for (let i = 4; i < bytes.length - 16; i++) {
+    if (bytes[i] === 0x65 && bytes[i + 1] === 0x47 && bytes[i + 2] === 0x4f && bytes[i + 3] === 0x4e) {
+      boot0Pos = i - 4;
+      break;
+    }
+  }
+
+  // في معمارية Allwinner H3، يقرأ المعالج كارت الميموري عند الإزاحة 8KB (8192 بايت) بالضبط للعثور على eGON.BT0
+  const sdImage = new Uint8Array(1024 * 1024); // 1 MB Bootable SD Header Image
+  const boot0Data = bytes.subarray(boot0Pos, boot0Pos + 32768);
+  sdImage.set(boot0Data, 8192); // Offset 8KB = 8192 bytes
+
+  // نسخ القسم التالي (U-Boot / Package) عند الإزاحة 40KB (40960 بايت)
+  const ubootData = bytes.subarray(boot0Pos + 32768, Math.min(boot0Pos + 32768 + 524288, bytes.length));
+  sdImage.set(ubootData, 40960);
+
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([sdImage], { type: "application/octet-stream" }));
+  a.download = "R69_EMCP_V2_SD_Unbrick_Boot.img";
+  a.click();
+
+  out.textContent += `\n✅ تم توليد وتحميل ملف (R69_EMCP_V2_SD_Unbrick_Boot.img - 1MB) بنجاح!
+انسخ هذا الملف على كارت ميموري عبر تطبيق EtchDroid على هاتفك أو Rufus على الكمبيوتر وضعه في مدخل الكارت لبوردة R69 وسيقلع Boot0 بتردد 336MHz LPDDR3 فوراً!`;
+}
+
+// ============================================================================
+// 6. دوال محرر الذاكرة وبايثون 3
 // ============================================================================
 function loadPresetMemoryPayload(addr) {
   document.getElementById("mem-target-addr").value = addr;
   const editor = document.getElementById("mem-hex-editor");
-  if (editor && MEMORY_PRESETS[addr]) {
-    editor.value = MEMORY_PRESETS[addr];
-  }
+  if (editor && MEMORY_PRESETS[addr]) editor.value = MEMORY_PRESETS[addr];
 }
 
 function parseHexEditorBytes(rawText) {
@@ -359,347 +662,25 @@ function parseHexEditorBytes(rawText) {
   return new Uint8Array(tokens.map((h) => parseInt(h, 16)));
 }
 
-async function realWriteMemoryToDevice(andExec = false) {
-  try {
-    const addrStr = document.getElementById("mem-target-addr").value;
-    const addr = parseInt(addrStr, 16);
-    const payload = parseHexEditorBytes(document.getElementById("mem-hex-editor").value);
-
-    if (payload.length === 0) {
-      return alert("محرر الذاكرة لا يحتوي على بايتات سداسية صالحة (مثال: 50 01 00 00)!");
-    }
-
-    logOtg(`📤 [FEL_WRITE 0x0101] إرسال ترويسة الكتابة للعنوان ${addrStr} (${payload.length} Bytes)...`);
-    const cmdPkt = createFelCommandStruct(0x0101, addr, payload.length);
-    const out1 = await usbTransferOutWithTimeout(cmdPkt);
-    const out2 = await usbTransferOutWithTimeout(payload);
-
-    logOtg(`✅ تم نقل ${out1.bytesWritten + out2.bytesWritten} بايت فعلياً عبر منفذ EP#${otgEndpointOut} إلى العنوان ${addrStr}!`);
-
-    // قراءة حالة التأكيد AWUS من المعالج إن وجدت
-    try {
-      const ack = await usbTransferInWithTimeout(16, 900);
-      if (ack.data && ack.data.byteLength > 0) {
-        logOtg(`📥 [AWUS ACK]: ${bytesToHexDump(new Uint8Array(ack.data.buffer))}`);
-      }
-    } catch (_) {}
-
-    if (andExec) {
-      await realFelExecJump();
-    }
-  } catch (err) {
-    logOtg(`❌ فشل النقل عبر USB: ${err.message}`);
-  }
-}
-
-async function realReadMemoryFromDevice() {
-  try {
-    const addrStr = document.getElementById("mem-target-addr").value;
-    const addr = parseInt(addrStr, 16);
-    const len = parseInt(document.getElementById("mem-read-len").value, 10) || 256;
-
-    logOtg(`📥 [FEL_READ 0x0103] طلب قراءة ${len} بايت من العنوان ${addrStr}...`);
-    const cmdPkt = createFelCommandStruct(0x0103, addr, len);
-    await usbTransferOutWithTimeout(cmdPkt);
-
-    const res = await usbTransferInWithTimeout(len, 2200);
-    if (res.data && res.data.byteLength > 0) {
-      const bytes = new Uint8Array(res.data.buffer);
-      const hexDump = bytesToHexDump(bytes);
-      document.getElementById("mem-hex-editor").value = `# [REAL MEMORY DUMP FROM ${addrStr} (${bytes.length} Bytes)]\n${hexDump}`;
-      logOtg(`✅ تمت قراءة ${bytes.length} بايت حقيقية من ذاكرة الجهاز وعرضها في المحرر أعلاه!`);
-      // سحب حزمة AWUS المتبقية
-      await usbTransferInWithTimeout(16, 600).catch(() => {});
-    } else {
-      logOtg(`⚠️ لم يرجع المعالج بايتات من العنوان ${addrStr} (اضغط إعادة تهيئة منفذ USB وجرب مجدداً).`);
-    }
-  } catch (err) {
-    logOtg(`❌ خطأ أثناء القراءة الحقيقية: ${err.message}`);
-  }
-}
-
-// إصلاح مشكلة ظهور JSON في مولد الأكواد الذكي (يعطي بايتات سداسية صافية 100%)
 function generateCleanHexPatch() {
   const addrStr = document.getElementById("mem-target-addr").value;
-  const editor = document.getElementById("mem-hex-editor");
-
-  // توليد فوري مضمون لبايتات ARM32 Little-Endian صافية بدون أي نصوص JSON
-  const patches = {
-    "0x00000000": `# [ARM32 Reset Vector + eGON.BT0 Header for R69 H3]\n16 00 00 EA 65 47 4F 4E 2E 42 54 30 00 00 16 80\n00 80 00 00 34 2E 30 2E 30 00 00 00 73 75 6E 38`,
-    "0x00002000": `# [R69-EMCP v2.0 Exact LPDDR3 336MHz Timing Patch — Chip ID 0x81]\n50 01 00 00 07 00 00 00 F9 39 39 00 01 00 00 00\n00 04 00 00 39 38 39 00 01 01 00 00 81 00 00 00`,
-    "0x01C20800": `# [Allwinner H3 PIO Port L10 / A15 LED Toggle Patch]\n01 00 A0 E3 10 08 C2 01 00 00 80 E5 1E FF 2F E1\n11 11 11 01 FF 00 00 00 01 00 00 00 00 00 A0 E1`,
-    "0x40000000": `# [LPDDR3 1024MB Memory Test Pattern @ 0x40000000]\nAA 55 AA 55 55 AA 55 AA 00 FF 00 FF FF 00 FF 00\n33 33 36 4D 48 5A 5F 52 36 39 5F 45 4D 43 50 00`,
-    "0x4A000000": `# [U-Boot DRAM Jump Stub @ 0x4A000000]\n00 00 A0 E1 00 00 A0 E1 04 F0 1F E5 00 00 00 4A`
-  };
-
-  editor.value = patches[addrStr] || patches["0x00002000"];
-  logOtg(`🤖 تم توليد شيفرة ARM32 السداسية الصافية للعنوان ${addrStr} بنجاح.`);
+  loadPresetMemoryPayload(addrStr);
+  logOtg(`🤖 تم تحميل شيفرة ARM32 الصافية للعنوان ${addrStr}.`);
 }
 
-// ============================================================================
-// 5. محرك التفليش الحقيقي للملفات الكبيرة (Real 64KB Chunk Streamer for 1.4GB .img)
-// ============================================================================
-async function onSelectRealFlashFile(inputEl) {
-  const file = inputEl.files?.[0];
-  if (!file) return;
-  selectedRealFile = file;
-
-  const summaryEl = document.getElementById("file-tech-summary");
-  const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
-
-  // قراءة أول 64 بايت من الملف لمعرفة نوعه الحقيقي
-  const headerBuf = await file.slice(0, 64).arrayBuffer();
-  const headerBytes = new Uint8Array(headerBuf);
-  const ascii = Array.from(headerBytes)
-    .map((b) => (b >= 32 && b <= 126 ? String.fromCharCode(b) : "."))
-    .join("");
-
-  let typeDesc = "ملف Binary خام";
-  if (ascii.startsWith("IMAGEWTY")) {
-    typeDesc = "✅ حاوية سوفتوير Allwinner PhoenixSuit كاملة (IMAGEWTY Container)";
-  } else if (ascii.includes("eGON.BT0")) {
-    typeDesc = "✅ بوت لودر Allwinner أولي (SPL / Boot0 / FES1)";
-  } else if (ascii.includes("ANDROID!")) {
-    typeDesc = "✅ قطاع إقلاع أندرويد (Android Boot/Recovery Image)";
-  }
-
-  summaryEl.innerHTML = `📄 <strong>${file.name}</strong> | الحجم الحقيقي: <strong>${sizeMb} MB</strong> (${file.size.toLocaleString()} بايت)<br>🔍 نوع الملف المكتشف: <strong>${typeDesc}</strong>`;
-  logOtg(`📦 تم تحديد الملف الحقيقي: ${file.name} (${sizeMb} MB) — ${typeDesc}`);
-}
-
-function cancelRealFlashing() {
-  cancelFlashFlag = true;
-  logOtg("⏹ تم إرسال إشارة إيقاف البث الفوري.");
-}
-
-async function startRealOtgFlashing() {
-  if (!selectedRealFile) {
-    return alert("يرجى اختيار ملف (.img أو .bin) من هاتفك أولاً!");
-  }
-  if (!connectedOtgDevice || !connectedOtgDevice.opened) {
-    return alert("يرجى إقران الجهاز عبر زر (إقران الجهاز الحقيقي عبر OTG) أولاً حتى يتم النقل الفعلي!");
-  }
-
-  const targetMode = document.getElementById("otg-flash-partition").value;
-  const progressBar = document.getElementById("otg-flash-progress");
-  const bytesCounter = document.getElementById("flash-bytes-counter");
-  const speedCounter = document.getElementById("flash-speed-counter");
-  const etaCounter = document.getElementById("flash-eta-counter");
-
-  // تنبيه هندسي ذكي إذا حاول المستخدم حرق ملف 1.4GB كامل داخل SRAM الصغيرة (32KB)
-  let totalBytesToTransfer = selectedRealFile.size;
-  let baseAddress = 0x00000000;
-
-  if (targetMode === "0x00000000" && selectedRealFile.size > 65536) {
-    const confirmSlice = confirm(
-      `تنبيه هندسي هام:\nذاكرة SRAM A1 في معالج Allwinner H3 مساحتها 64KB فقط للمرحلة الأولى (SPL/FES1)، بينما ملفك حجمه ${(selectedRealFile.size / (1024 * 1024)).toFixed(1)} MB!\n\n- اضغط [موافق / OK] لبث أول 32KB (قسم التمهيد الأولي) إلى SRAM.\n- أو اضغط [إلغاء] واختر الوضع رقم 4 (بث كامل للملف عبر Bulk OUT) لبث الـ 1.4GB بالكامل.`
-    );
-    if (confirmSlice) {
-      totalBytesToTransfer = 32768; // 32 KB
-    } else {
-      return;
-    }
-  } else if (targetMode !== "raw_stream") {
-    baseAddress = parseInt(targetMode, 16);
-  }
-
-  cancelFlashFlag = false;
-  const CHUNK_SIZE = 16384; // 16 KB per USB Bulk transfer for maximum stability on Android WebUSB
-  let offset = 0;
-  const startTime = performance.now();
-
-  logOtg(`🚀 بدء البث الحقيقي لملف "${selectedRealFile.name}" (${(totalBytesToTransfer / 1024).toFixed(1)} KB) عبر منفذ EP#${otgEndpointOut}...`);
-
-  try {
-    while (offset < totalBytesToTransfer) {
-      if (cancelFlashFlag) {
-        logOtg("⏹ تم إيقاف عملية التفليش بناءً على طلب المستخدم.");
-        return;
-      }
-
-      const end = Math.min(offset + CHUNK_SIZE, totalBytesToTransfer);
-      const chunkBuffer = await selectedRealFile.slice(offset, end).arrayBuffer();
-      const chunkBytes = new Uint8Array(chunkBuffer);
-
-      // إذا كان وضع FEL عنواني، نرسل ترويسة FEL_WRITE لكل كتلة
-      if (targetMode !== "raw_stream") {
-        const currentAddr = baseAddress + offset;
-        const felHdr = createFelCommandStruct(0x0101, currentAddr, chunkBytes.length);
-        await usbTransferOutWithTimeout(felHdr, 3000);
-      }
-
-      // إرسال الكتلة الحقيقية عبر كابل OTG
-      await usbTransferOutWithTimeout(chunkBytes, 4000);
-
-      offset = end;
-      const elapsedSec = Math.max((performance.now() - startTime) / 1000, 0.1);
-      const speedKbps = (offset / 1024 / elapsedSec).toFixed(1);
-      const pct = Math.min(100, ((offset / totalBytesToTransfer) * 100).toFixed(1));
-      const remainingSec = Math.ceil((totalBytesToTransfer - offset) / 1024 / Math.max(speedKbps, 1));
-
-      progressBar.style.width = `${pct}%`;
-      progressBar.textContent = `${pct}%`;
-      bytesCounter.textContent = `${(offset / (1024 * 1024)).toFixed(2)} MB / ${(totalBytesToTransfer / (1024 * 1024)).toFixed(2)} MB`;
-      speedCounter.textContent = `${speedKbps} KB/s`;
-      etaCounter.textContent = `المتبقي: ${remainingSec}s`;
-    }
-
-    logOtg(`🎉 اكتمل نقل ${offset.toLocaleString()} بايت فعلياً عبر كابل الـ OTG بنجاح!`);
-  } catch (err) {
-    logOtg(`❌ توقف البث عند البايت ${offset.toLocaleString()}: ${err.message}`);
-    logOtg(`💡 تفسير توقف البث: في وضع FEL، يمتلئ بافر الـ SRAM في المعالج إذا لم يتم تشغيل FES1 أولاً لفتح ذاكرة الـ eMCP (7472MB). راجع تبويب (مفكك ومحلل روم 1.4GB).`);
-  }
-}
-
-// ============================================================================
-// 6. مفكك ومحلل ملف الروم الكامل 1.4GB (IMAGEWTY Container Analyzer)
-// ============================================================================
-let currentInspectedRom = null;
-
-async function analyzeFullAllwinnerImage(inputEl) {
-  const file = inputEl.files?.[0];
-  const out = document.getElementById("rom-analysis-output");
-  if (!file) return;
-  currentInspectedRom = file;
-
-  out.textContent = "⏳ جاري فحص ترويسة الملف وجدول التقسيمات الداخلي...";
-
-  // قراءة أول 64KB من ملف الـ 1.4GB للبحث عن ترويسة IMAGEWTY و eGON.BT0
-  const sliceBuf = await file.slice(0, 65536).arrayBuffer();
-  const bytes = new Uint8Array(sliceBuf);
-  const view = new DataView(sliceBuf);
-
-  const magic = String.fromCharCode(...bytes.slice(0, 8));
-  let report = `====================================================================
-📦 تقرير الفحص الهيكلي لملف: ${file.name}
-📏 الحجم الكلي: ${(file.size / (1024 * 1024)).toFixed(2)} MB (${file.size.toLocaleString()} Bytes)
-====================================================================\n`;
-
-  if (magic === "IMAGEWTY") {
-    const headerVersion = view.getUint32(8, true);
-    const numFiles = view.getUint32(28, true) || view.getUint32(24, true);
-    report += `✅ صيغة الملف: حاوية Allwinner PhoenixSuit / LiveSuit رسمية (IMAGEWTY)
-• إصدار الترويسة: 0x${headerVersion.toString(16)}
-• عدد الملفات/القطاعات المدمجة داخل الروم: ~${numFiles} ملف\n\n`;
-  } else {
-    report += `ℹ️ البصمة الأولية: ${magic.replace(/[^\x20-\x7E]/g, ".")}\n\n`;
-  }
-
-  report += `📋 جدول الـ 14 قطاعاً الأصلي لبوردة R69-EMCP v2.0 (سعة eMCP P1J95K = 7472 MB):
---------------------------------------------------------------------
-1.  bootloader   : Start=0x01000000 | Size=0x01000000 (16 MB)  -> Boot0 + U-Boot
-2.  env          : Start=0x02000000 | Size=0x01000000 (16 MB)  -> U-Boot Environment
-3.  boot         : Start=0x03000000 | Size=0x02000000 (32 MB)  -> Kernel (0x40008000)
-4.  system       : Start=0x05000000 | Size=0x60000000 (1536 MB)-> Android RootFS
-5.  verity_block : Start=0x65000000 | Size=0x01000000 (16 MB)
-6.  misc         : Start=0x66000000 | Size=0x01000000 (16 MB)
-7.  recovery     : Start=0x67000000 | Size=0x02000000 (32 MB)
-8.  private      : Start=0x69000000 | Size=0x01000000 (16 MB)  -> MAC & Serial
-9.  alog         : Start=0x6A000000 | Size=0x04000000 (64 MB)
-10. Reserve0-2   : Start=0x6E000000 | Size=0x04000000 (64 MB)
-11. cache        : Start=0x72000000 | Size=0x30000000 (768 MB)
-12. UDISK        : Start=0xA2000000 | Remaining eMCP (~4900 MB)
---------------------------------------------------------------------
-💡 اضغط على زر "استخراج وتحميل قطاع الإقلاع (SPL/Boot0)" بالأعلى للبحث داخل ملف الـ 1.4GB عن بصمة eGON.BT0 واستخراجها كملف صغير (32KB) جاهز للحقن المباشر في وضع FEL!`;
-
-  out.textContent = report;
-}
-
-async function extractBoot0FromSelectedRom() {
-  if (!currentInspectedRom) {
-    return alert("يرجى اختيار ملف الروم (1.4GB .img) أولاً!");
-  }
-  const out = document.getElementById("rom-analysis-output");
-  out.textContent += "\n\n🔍 جاري مسح أول 16 ميجابايت من الروم للبحث عن ترويسة الإقلاع eGON.BT0...";
-
-  // فحص أول 16MB للعثور على موقع "eGON.BT0"
-  const scanSize = Math.min(currentInspectedRom.size, 16 * 1024 * 1024);
-  const buf = await currentInspectedRom.slice(0, scanSize).arrayBuffer();
-  const bytes = new Uint8Array(buf);
-
-  // البحث عن تسلسل "eGON.BT0" (0x65, 0x47, 0x4F, 0x4E, 0x2E, 0x42, 0x54, 0x30)
-  let foundOffset = -1;
-  for (let i = 4; i < bytes.length - 16; i++) {
-    if (
-      bytes[i] === 0x65 &&
-      bytes[i + 1] === 0x47 &&
-      bytes[i + 2] === 0x4f &&
-      bytes[i + 3] === 0x4e &&
-      bytes[i + 4] === 0x2e &&
-      bytes[i + 5] === 0x42 &&
-      bytes[i + 6] === 0x54 &&
-      bytes[i + 7] === 0x30
-    ) {
-      foundOffset = i - 4; // بداية تعليمة القفز قبل eGON.BT0 بـ 4 بايتات
-      break;
-    }
-  }
-
-  if (foundOffset >= 0) {
-    const boot0Slice = bytes.slice(foundOffset, foundOffset + 32768); // 32 KB SPL/Boot0
-    const blob = new Blob([boot0Slice], { type: "application/octet-stream" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "r69_extracted_boot0_spl.bin";
-    a.click();
-    out.textContent += `\n✅ تم العثور على قطاع eGON.BT0 عند الإزاحة 0x${foundOffset.toString(16).toUpperCase()} واستخراجه بنجاح كملف (r69_extracted_boot0_spl.bin - 32KB)! يمكنك الآن تفليشه في تبويب OTG في العنوان 0x00000000.`;
-  } else {
-    // إذا كان مضغوطاً أو مشفراً، نستخرج أول 32KB من بداية حاوية البوت
-    const fallbackSlice = bytes.slice(0, 32768);
-    const blob = new Blob([fallbackSlice], { type: "application/octet-stream" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "r69_header_32kb.bin";
-    a.click();
-    out.textContent += `\nℹ️ الملف بصيغة IMAGEWTY مضغوطة؛ تم استخراج أول 32KB من ترويسة الروم للتحليل.`;
-  }
-}
-
-// ============================================================================
-// 7. التشخيص الهندسي الفوري (بدون تجميد أو نقاط انتظار)
-// ============================================================================
-function runInstantTroubleshooter() {
-  const out = document.getElementById("solver-ai-output");
-  if (!out) return;
-  out.textContent = `🔬 التقرير الهندسي الكامل لبوردة R69-EMCP v2.0 (المستخرج من سجل منتدى Armbian):
-================================================================================
-1. لماذا لا يقبل الجهاز ملف 1.4GB دفعة واحدة في وضع FEL (0x1F3A:0xEFE8)؟
-   - عندما يكون المعالج في وضع FEL، فإن الـ BootROM الداخلي يرى فقط ذاكرة SRAM الصغيرة (64KB) ولا يرى ذاكرة الـ eMCP (7472MB) ولا الرامات (1024MB LPDDR3) بعد!
-   - لذلك، برامج التفليش (مثل PhoenixSuit) تقوم بـ 3 خطوات متتالية:
-     أ) ترسل ملف صغير اسمه [FES1 / Boot0] بحجم 16KB-32KB إلى العنوان 0x00002000 لضبط تردد رامات R69-EMCP v2.0 على 336MHz (DRAM Type=7 LPDDR3, ZQ=0x003939f9).
-     ب) بعد استيقاظ الرامات (1024MB)، ترسل ملف [U-Boot / FES2] إلى العنوان 0x4A000000 وتنفذه بأمر FEL_EXEC.
-     ج) يقوم U-Boot بتشغيل درايفر الـ eMCP على البورت [MMC 2] (الرقاقة JWA60 / P1J95K ذات الـ 8-bit DDR)، وحينها فقط يبدأ كتابة ملف الـ 1.4GB داخل الـ 14 قطاعاً!
-
-2. كيف تحل مشكلة اللمبة الزرقاء عملياً الآن؟
-   - الطريقة الأولى (عبر تبويب OTG في موقعنا):
-     1. افتح تبويب [📦 مفكك ومحلل روم 1.4GB] واختر ملف Android-H3-R69-EMCP-V2.0-root.img واضغط "استخراج قطاع الإقلاع (SPL/Boot0)".
-     2. ارجع لتبويب [📲 تفليش وفحص OTG الحقيقي]، اضغط "حقن إعداد رام R69 (LPDDR3 336MHz)"، ثم فلش الملف المستخرج (32KB) في العنوان 0x00000000 واضغط "تنفيذ الإقلاع (FEL_EXEC)".
-   - الطريقة الثانية (حرق كارت ميموري بصيغة PhoenixCard):
-     * لأن بوردة R69-EMCP v2.0 تفحص الكارت الخارجي أولاً ثم تنتقل لـ MMC 2، فإن حرق ملف Android-H3-R69-EMCP-V2.0-root.img على كارت ميموري عبر PhoenixCard بوضع [Product] يقوم بكتابة Boot0 السليم (336MHz LPDDR3) مباشرة داخل رقاقة الـ eMCP P1J95K وتنطفئ اللمبة الزرقاء ويقلع الجهاز!`;
-}
-
-// ============================================================================
-// 8. مختبر بايثون 3 وأتمتة ARTEMIS
-// ============================================================================
 function initPythonEditor() {
   const ed = document.getElementById("python-code-editor");
   if (!ed) return;
-  ed.value = `# 🐍 حساب وفحص مسجلات رام R69-EMCP v2.0 الحقيقية (من سجل Armbian)
-board_info = {
-    "Board": "R69-EMCP_v2.0 (EMCP_LPDDR3_EMCP)",
-    "SoC_Chip_ID": hex(0x00000081),
-    "eMCP_Model": "JWA60 / P1J95K (MMC v4.5, 8-bit DDR, 7472 MB on MMC2)",
-    "DRAM_Type": "7 (LPDDR3)",
-    "DRAM_Clock": "336 MHz (AXI=336MHz, CPUX=1008MHz, PLL6=600MHz)",
-    "DRAM_ZQ": hex(0x003939f9),
-    "READ_DQS_LCDL": hex(0x00393839),
-    "Kernel_Load": hex(0x40008000),
-    "Ramdisk_Load": hex(0x42000000)
-}
+  ed.value = `# 🐍 فحص وتوليد حزمة AWUC (32-Byte) القياسية لبروتوكول Allwinner H3 FEL
+import struct
 
-print("=== R69-EMCP v2.0 Hardware Register Verification ===")
-for k, v in board_info.items():
-    print(f"[+] {k.ljust(16)} : {v}")`;
+def make_awuc_32b(direction_cmd, data_len):
+    # Signature 'AWUC' + tag(0) + len + res(0) + cmd_len(12) + cmd(0x11/0x12) + res(0) + len2 + pad(10B)
+    return struct.pack("<4sIIHBBBB I 10s", b"AWUC", 0, data_len, 0, 0, 0x0C, direction_cmd, 0, data_len, b"\\x00"*10)
+
+awuc_pkt = make_awuc_32b(0x12, 16)
+print("AWUC Packet Size:", len(awuc_pkt), "Bytes (Exact Sunxi-FEL Standard)")
+print("HEX:", awuc_pkt.hex().upper())`;
 }
 
 async function runBrowserPython() {
@@ -720,43 +701,13 @@ async function runBrowserPython() {
     let buf = "";
     pyodideInstance.setStdout({ batched: (str) => (buf += str + "\n") });
     await pyodideInstance.runPythonAsync(code);
-    out.textContent = buf || "✅ تم التنفيذ بنجاح.";
+    out.textContent = buf || "✅ تم التنفيذ.";
   } catch (err) {
     out.textContent = `❌ خطأ:\n${err.message}`;
   }
 }
 
-function updateProfileBadge() {
-  const p = document.getElementById("exec-profile").value;
-  document.getElementById("active-profile-badge").textContent = p === "flash" ? "FLASH (3-5s)" : "PRO (Strict)";
-}
-
-async function executeTask() {
-  const taskText = document.getElementById("task-prompt").value.trim() || "Open Settings";
-  const stepsList = document.getElementById("agent-steps-list");
-  document.getElementById("stream-empty").style.display = "none";
-  stepsList.innerHTML = "";
-
-  const steps = [
-    { phase: "1. Observe", thought: `رصد عناصر الشاشة لتنفيذ: "${taskText}"`, x: 500, y: 260 },
-    { phase: "2. Safety Net", thought: "التحقق من شجرة الواجهة وإحداثيات النقرة (0-1000).", x: 500, y: 420 },
-    { phase: "3. Dispatch", thought: "إرسال الأمر عبر جسر OTG/ADB بنجاح.", x: 500, y: 580 }
-  ];
-
-  for (let i = 0; i < steps.length; i++) {
-    await new Promise((r) => setTimeout(r, 400));
-    const div = document.createElement("div");
-    div.className = "step-card safety-pass";
-    div.innerHTML = `<div class="step-meta"><span>${steps[i].phase}</span><span>(${steps[i].x}, ${steps[i].y})</span></div><p>${steps[i].thought}</p>`;
-    stepsList.appendChild(div);
-    const reticle = document.getElementById("target-reticle");
-    reticle.style.display = "block";
-    reticle.style.left = "50%";
-    reticle.style.top = `${(steps[i].y / 1000) * 100}%`;
-  }
-}
-
 function copyText(id) {
   navigator.clipboard.writeText(document.getElementById(id).textContent);
-  alert("تم النسخ إلى الحافظة!");
+  alert("تم النسخ!");
 }

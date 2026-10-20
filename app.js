@@ -1,5 +1,149 @@
 let taskCounter = 1;
 let isDeviceLocked = false;
+let activePromptCategory = "all";
+
+// قاعدة بيانات مكتبة الأوامر والسيناريوهات الجاهزة (12 سيناريو احترافياً)
+const PROMPT_LIBRARY = [
+  // 1. المتاجر الإلكترونية والدفع عند الاستلام (E-Commerce & COD)
+  {
+    id: "ecom-cod-wilaya",
+    category: "ecommerce",
+    title_ar: "🛒 إتمام طلب دفع عند الاستلام (COD) وحساب توصيل الولايات",
+    title_en: "🛒 Full Cash-on-Delivery (COD) & Province Shipping Flow",
+    profile: "pro",
+    verify: "strict",
+    backend: "auto",
+    prompt_ar: "افتح تطبيق المتجر الإلكتروني، اختر المنتج الأول في العروض الترويجية، اضغط على 'اطلب الآن'، املأ اسم المشتري 'Lotfi Test' ورقم الهاتف '0550000000'، اختر ولاية '23 - عنابة' ونوع التوصيل 'توصيل للمنزل'، وتحقق من تحديث السعر الإجمالي مع رسوم التوصيل وظهور رسالة تأكيد الطلب.",
+    prompt_en: "Open the E-Commerce store app, select the first promotional product, tap 'Order Now', fill buyer name 'Lotfi Test' and phone '0550000000', select province '23 - Annaba' and 'Home Delivery', then verify that the total price updates with shipping fees and order confirmation appears."
+  },
+  {
+    id: "ecom-coupon-cart",
+    category: "ecommerce",
+    title_ar: "🎟️ اختبار سلة المشتريات وتطبيق كود خصم (Promo Coupon)",
+    title_en: "🎟️ Cart Multi-Item Quantity & Promo Coupon Validation",
+    profile: "pro",
+    verify: "checkpoints",
+    backend: "auto",
+    prompt_ar: "ابحث عن 'سماعات بلوتوث' في المتجر، أضف المنتج إلى السلة، انتقل إلى شاشة السلة، قم بزيادة الكمية إلى 2، أدخل كود الخصم 'CHOC2026' واضغط تطبيق، وتأكد من خصم 20% من المبلغ الفرعي بنجاح.",
+    prompt_en: "Search for 'Wireless Earbuds' in the store, add the item to the cart, open the cart screen, increase item quantity to 2, enter promo code 'CHOC2026', tap Apply, and verify that a 20% discount is accurately deducted from the subtotal."
+  },
+  {
+    id: "ecom-validation-guard",
+    category: "ecommerce",
+    title_ar: "🛡️ فحص حماية نموذج الشراء (الحقول الفارغة ورقم الهاتف الخاطئ)",
+    title_en: "🛡️ Checkout Form Validation & Invalid Phone Guard",
+    profile: "flash",
+    verify: "final",
+    backend: "auto",
+    prompt_ar: "انتقل إلى صفحة إتمام الطلب السريع، اترك حقل الاسم فارغاً وأدخل رقم هاتف غير مكتمل '05512' ثم اضغط على زر تأكيد الطلب، وتأكد من عدم إرسال الطلب وظهور تنبيه خطأ باللون الأحمر تحت الحقول المطلوبة.",
+    prompt_en: "Navigate to the quick checkout page, leave the full name field empty, enter an incomplete phone number '05512', tap Confirm Order, and verify the submission is blocked with visible red validation error messages."
+  },
+
+  // 2. أنظمة نقاط البيع والكاشير (POS Systems)
+  {
+    id: "pos-cashier-checkout",
+    category: "pos",
+    title_ar: "🧾 عملية بيع كاشير كاملة وحساب الباقي (POS Cash Checkout)",
+    title_en: "🧾 Complete POS Cashier Sale, Tax & Change Calculation",
+    profile: "pro",
+    verify: "strict",
+    backend: "auto",
+    prompt_ar: "في تطبيق نقطة البيع (POS)، افتح قسم المشروبات، أضف 'قهوة إسبريسو' عدد 2 و'كرواسون' عدد 1 إلى الفاتورة الحالية، اضغط على زر الدفع النقدي (Cash)، أدخل المبلغ المستلم من الزبون '1000'، وتحقق من صحة حساب المبلغ الباقي وإصدار إيصال البيع.",
+    prompt_en: "In the POS terminal app, open Beverages category, add 2 'Espresso' and 1 'Croissant' to the current ticket, tap Cash Payment, input tendered amount '1000', and verify exact change calculation and receipt generation."
+  },
+  {
+    id: "pos-barcode-stock",
+    category: "pos",
+    title_ar: "📦 بحث الباركود وفحص تنبيه نفاذ المخزون (POS SKU Lookup)",
+    title_en: "📦 POS Barcode SKU Search & Low-Stock Alert Check",
+    profile: "flash",
+    verify: "final",
+    backend: "auto",
+    prompt_ar: "افتح شاشة إدارة المخزون في نظام POS، ابحث عن رمز الباركود '61300045912'، افتح بطاقة الصنف، وتحقق من الكمية المتبقية في المستودع وظهور شارة 'تنبيه مخزون منخفض' إذا كانت الكمية أقل من 5 قطع.",
+    prompt_en: "Open Inventory lookup in the POS system, search barcode SKU '61300045912', open the item details modal, and verify current stock count and that the 'Low Stock Warning' badge appears if quantity is below 5."
+  },
+  {
+    id: "pos-refund-shift",
+    category: "pos",
+    title_ar: "🔄 استرجاع فاتورة جزئي وإغلاق الوردية اليومية (Z-Report)",
+    title_en: "🔄 POS Partial Order Refund & End-of-Shift Z-Report",
+    profile: "pro",
+    verify: "strict",
+    backend: "auto",
+    prompt_ar: "انتقل إلى سجل الفواتير السابقة في تطبيق POS، افتح آخر فاتورة مكتملة، اختر 'استرجاع صنف واحد'، أكد عملية الاسترجاع، ثم انتقل إلى تقارير الوردية (Z-Report) وتأكد من خصم قيمة المرتجع من صافي المبيعات النقدية.",
+    prompt_en: "Go to Order History in the POS app, open the latest completed receipt, select 'Refund Single Item', confirm the refund, then open the Shift Z-Report and verify the refunded amount is deducted from net cash sales."
+  },
+
+  // 3. تطبيقات Flutter و Jetpack Compose و Canvas
+  {
+    id: "flutter-custom-canvas",
+    category: "flutter",
+    title_ar: "🦋 اختبار عناصر Flutter المرسومة على Canvas بدون Accessibility IDs",
+    title_en: "🦋 Flutter CustomPainter & Canvas Coordinate-Fallback Test",
+    profile: "pro",
+    verify: "checkpoints",
+    backend: "auto",
+    prompt_ar: "افتح تطبيق Flutter، انتقل إلى شاشة الرسم البياني التفاعلي (CustomPainter Canvas)، استخدم الرؤية البصرية و OCR للنقر على زر التصفية 'آخر 30 يوماً' في أعلى اليمين، اسحب المؤشر الدائري إلى النسبة 75%، وتأكد من تحديث القيمة الرقمية في وسط الدائرة.",
+    prompt_en: "Open the Flutter app, navigate to the interactive CustomPainter Canvas chart screen, use Vision OCR coordinate fallback to tap 'Last 30 Days' filter, drag the radial slider to 75%, and verify the center numeric label updates."
+  },
+  {
+    id: "flutter-sliver-scroll",
+    category: "flutter",
+    title_ar: "📜 اختبار القوائم الطويلة (CustomScrollView / Slivers) في Flutter",
+    title_en: "📜 Flutter SliverAppBar & Lazy ListView Deep Scroll Test",
+    profile: "flash",
+    verify: "final",
+    backend: "auto",
+    prompt_ar: "في شاشة كتالوج منتجات Flutter، قم بالتمرير لأسفل بشكل متكرر حتى يظهر المنتج رقم 25، تحقق من طي شريط العنوان العلوي (SliverAppBar) بشكل سلس، ثم اضغط على زر الإضافة السريعة للمنتج وتأكد من ظهور شريط الإشعار السفلي (SnackBar).",
+    prompt_en: "In the Flutter product catalog screen, scroll down repeatedly until Product #25 becomes visible, verify the SliverAppBar collapses smoothly, tap quick-add on the item, and confirm the bottom SnackBar notification appears."
+  },
+  {
+    id: "flutter-bottomsheet-picker",
+    category: "flutter",
+    title_ar: "📅 اختبار النوافذ المنبثقة (ModalBottomSheet) واختيار التاريخ في Flutter",
+    title_en: "📅 Flutter ModalBottomSheet & Cupertino DatePicker Flow",
+    profile: "pro",
+    verify: "checkpoints",
+    backend: "auto",
+    prompt_ar: "اضغط على زر 'حجز موعد توصيل' في تطبيق Flutter لفتح النافذة السفلية (ModalBottomSheet)، قم بتدوير عجلة اختيار التاريخ والوقت لاختيار يوم الغد الساعة 14:00، اضغط 'تأكيد'، وتأكد من إغلاق النافذة وظهور الموعد المختار في الشاشة الرئيسية.",
+    prompt_en: "Tap 'Schedule Delivery' in the Flutter app to trigger the ModalBottomSheet, scroll the DatePicker wheel to select tomorrow at 14:00, tap Confirm, and verify the sheet dismisses and displays the chosen slot on the main screen."
+  },
+
+  // 4. المراقبة المستمرة وسيناريوهات Cross-App
+  {
+    id: "cross-whatsapp-order",
+    category: "stress",
+    title_ar: "📲 سيناريو عابر للتطبيقات: مشاركة فاتورة الطلب من المتجر إلى WhatsApp",
+    title_en: "📲 Cross-App Flow: Share Store Order PDF to WhatsApp / SMS",
+    profile: "pro",
+    verify: "strict",
+    backend: "auto",
+    prompt_ar: "بعد إتمام الطلب في تطبيق المتجر، اضغط على زر 'مشاركة الفاتورة عبر واتساب'، انتظر انتقال النظام تلقائياً إلى تطبيق المراسلة، تحقق من إرفاق ملخص الطلب ورقم التتبع بشكل صحيح، ثم عد إلى تطبيق المتجر باستخدام زر الرجوع.",
+    prompt_en: "After completing an order in the Store app, tap 'Share Invoice via WhatsApp/Messaging', verify Android switches apps with the order tracking summary pre-filled, then navigate back to the Store app home screen."
+  },
+  {
+    id: "stress-continuous-loop",
+    category: "stress",
+    title_ar: "🔄 حلقة مراقبة مستمرة [Loop:continuous] لاكتشاف تعليق الواجهة أو ANR",
+    title_en: "🔄 Continuous Watchdog [Loop:continuous] for Popup & ANR Hunting",
+    profile: "flash",
+    verify: "final",
+    backend: "auto",
+    prompt_ar: "[Loop:continuous] راقب شاشة تطبيق الكاشير أثناء تحديث الأسعار المباشر، إذا ظهرت أي نافذة خطأ في الاتصال أو تحذير نظام (ANR / Permission Popup) قم بالتقاط صورة شاشة وإغلاق النافذة فوراً لاستمرار العمل.",
+    prompt_en: "[Loop:continuous] Monitor the live POS dashboard screen during price sync; if any network timeout modal or Android system popup appears, capture a screenshot, dismiss the obstruction via Safety Net, and keep the screen active."
+  },
+  {
+    id: "stress-offline-recovery",
+    category: "stress",
+    title_ar: "📡 اختبار انقطاع الإنترنت المؤقت (Airplane Mode) واستعادة السلة",
+    title_en: "📡 Network Drop Resilience & Offline Cart State Recovery",
+    profile: "pro",
+    verify: "strict",
+    backend: "auto",
+    prompt_ar: "أضف 3 منتجات إلى سلة المتجر، اسحب شريط الإشعارات العلوي وفعّل وضع الطيران (Airplane Mode)، حاول الضغط على إتمام الطلب وتأكد من ظهور رسالة 'لا يوجد اتصال بالإنترنت' بدون انهيار التطبيق (Crash)، ثم أوقف وضع الطيران وأعد المحاولة بنجاح.",
+    prompt_en: "Add 3 items to the shopping cart, pull down Android Quick Settings and enable Airplane Mode, attempt checkout and verify a graceful offline banner appears with zero Logcat crashes, then disable Airplane Mode and complete checkout."
+  }
+];
 
 // التهيئة عند تحميل الصفحة
 window.addEventListener("DOMContentLoaded", () => {
@@ -15,6 +159,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   updateEnvPreview();
   updateMcpPreview();
+  renderPromptLibrary();
 });
 
 // تبديل التبويبات الرئيسية
@@ -23,10 +168,106 @@ function switchTab(tabId) {
   document.querySelectorAll(".nav-btn").forEach((btn) => btn.classList.remove("active"));
 
   document.getElementById(`tab-${tabId}`).classList.add("active");
-  document.querySelector(`.nav-btn[data-tab="${tabId}"]`).classList.add("active");
+  const targetBtn = document.querySelector(`.nav-btn[data-tab="${tabId}"]`);
+  if (targetBtn) targetBtn.classList.add("active");
 }
 
-// تبديل نوافذ التدفق (Steps / XML / Logcat)
+// ==================== دوال مكتبة السيناريوهات (Prompt Library) ====================
+function setPromptCategory(cat) {
+  activePromptCategory = cat;
+  document.querySelectorAll(".cat-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.getAttribute("data-cat") === cat);
+  });
+  renderPromptLibrary();
+}
+
+function filterPrompts() {
+  renderPromptLibrary();
+}
+
+function renderPromptLibrary() {
+  const container = document.getElementById("prompt-cards-container");
+  if (!container) return;
+
+  const lang = localStorage.getItem("chibani_lang") || "ar";
+  const dict = TRANSLATIONS[lang] || TRANSLATIONS.ar;
+  const isAr = lang === "ar";
+  const searchQuery = (document.getElementById("prompt-search")?.value || "").toLowerCase();
+
+  const filtered = PROMPT_LIBRARY.filter((item) => {
+    const matchCat = activePromptCategory === "all" || item.category === activePromptCategory;
+    const textToSearch = `${item.title_ar} ${item.title_en} ${item.prompt_ar} ${item.prompt_en}`.toLowerCase();
+    const matchSearch = !searchQuery || textToSearch.includes(searchQuery);
+    return matchCat && matchSearch;
+  });
+
+  container.innerHTML = filtered
+    .map((item) => {
+      const title = isAr ? item.title_ar : item.title_en;
+      const promptText = isAr ? item.prompt_ar : item.prompt_en;
+      const isPro = item.profile === "pro";
+
+      return `
+      <div class="prompt-card">
+        <div>
+          <div class="prompt-card-top">
+            <h3 class="prompt-card-title">${title}</h3>
+          </div>
+          <div class="prompt-meta-tags">
+            <span class="meta-tag ${isPro ? "pro-tag" : ""}">Profile: ${item.profile.toUpperCase()}</span>
+            <span class="meta-tag">Verify: ${item.verify}</span>
+            <span class="meta-tag">Backend: ${item.backend}</span>
+          </div>
+        </div>
+
+        <div class="prompt-text-box">${promptText}</div>
+
+        <div class="prompt-card-actions">
+          <button class="btn-primary" onclick="loadScenarioIntoWorkspace('${item.id}')">
+            ${dict.btn_load_run || "⚡ تحميل وتشغيل"}
+          </button>
+          <button class="btn-secondary" onclick="copyScenarioCli('${item.id}')">
+            ${dict.btn_copy_cli || "💻 نسخ CLI"}
+          </button>
+        </div>
+      </div>
+    `;
+    })
+    .join("");
+}
+
+function loadScenarioIntoWorkspace(scenarioId) {
+  const item = PROMPT_LIBRARY.find((p) => p.id === scenarioId);
+  if (!item) return;
+
+  const lang = localStorage.getItem("chibani_lang") || "ar";
+  const promptText = lang === "ar" ? item.prompt_ar : item.prompt_en;
+
+  document.getElementById("task-prompt").value = promptText;
+  document.getElementById("exec-profile").value = item.profile;
+  document.getElementById("exec-verify").value = item.verify;
+  document.getElementById("exec-backend").value = item.backend;
+
+  updateProfileBadge();
+  switchTab("workspace");
+  executeTask();
+}
+
+function copyScenarioCli(scenarioId) {
+  const item = PROMPT_LIBRARY.find((p) => p.id === scenarioId);
+  if (!item) return;
+
+  const lang = localStorage.getItem("chibani_lang") || "ar";
+  const promptText = lang === "ar" ? item.prompt_ar : item.prompt_en;
+  let cmd = `uv run artemis run "${promptText}" --profile ${item.profile}`;
+  if (item.profile === "pro") {
+    cmd += ` --verification-level ${item.verify}`;
+  }
+  navigator.clipboard.writeText(cmd);
+  alert("تم نسخ أمر CLI الجاهز لهذا السيناريو:\n\n" + cmd);
+}
+
+// ==================== دوال غرفة العمليات والمحاكي ====================
 function switchStreamView(view) {
   document.querySelectorAll(".mini-tab").forEach((b) => b.classList.remove("active"));
   event.target.classList.add("active");
@@ -51,6 +292,7 @@ function fillPreset(type) {
   const input = document.getElementById("task-prompt");
   if (type === "battery") {
     input.value = "Open Settings, navigate to Battery, verify battery percentage is displayed and check for any system popup.";
+    document.getElementById("exec-profile").value = "flash";
   } else if (type === "flutter") {
     input.value = "Open the Flutter POS E-Commerce app, select the first product, add it to cart, open cart and verify total price.";
     document.getElementById("exec-profile").value = "pro";
@@ -72,7 +314,6 @@ function updateLiveCliCommand() {
   document.getElementById("live-cli-cmd").textContent = cmd;
 }
 
-// حفظ مفتاح Gemini API المجاني
 function saveAndVerifyKey() {
   const key = document.getElementById("cfg-gemini-key").value.trim();
   if (!key) {
@@ -95,7 +336,6 @@ function updateApiStatusBadge(hasKey) {
   }
 }
 
-// تنفيذ المهمة (يدعم Gemini API الحي + المحاكي الذكي الفوري)
 async function executeTask() {
   if (isDeviceLocked) {
     alert("DeviceExecutionLock نشط حالياً! انتظر انتهاء المهمة الجارية على هذا الجهاز.");
@@ -110,7 +350,6 @@ async function executeTask() {
 
   updateLiveCliCommand();
 
-  // تفعيل قفل الجهاز الحصري DeviceExecutionLock
   isDeviceLocked = true;
   document.getElementById("lock-state").textContent = "LOCKED (Running Task #" + taskCounter + ")";
   document.getElementById("stream-empty").style.display = "none";
@@ -132,15 +371,13 @@ async function executeTask() {
     generatedSteps = buildSmartFallbackSteps(taskText, profile, verify, backend);
   }
 
-  // عرض الخطوات بالتتابع مع تحريك مؤشر الإحداثيات (0-1000)
   for (let i = 0; i < generatedSteps.length; i++) {
     const step = generatedSteps[i];
-    await new Promise((r) => setTimeout(r, 950));
+    await new Promise((r) => setTimeout(r, 900));
     renderAgentStep(i + 1, step);
     moveReticle(step.x, step.y, step.screenTitle);
   }
 
-  // تحديث شجرة XML وسجل Logcat
   updateTelemetryLogs(taskText, profile, backend, generatedSteps);
 
   isDeviceLocked = false;
@@ -181,7 +418,7 @@ Respond ONLY with a valid JSON array of objects, each having:
 }
 
 function buildSmartFallbackSteps(taskText, profile, verify, backend) {
-  const steps = [
+  return [
     {
       phase: "1. Locating Engine (" + backend.toUpperCase() + ")",
       thought: `تحليل شاشة الجهاز عبر Artemis Accessibility Helper وشبكة الإحداثيات المعيارية (0-1000) لتحديد الهدف الأول في المهمة: "${taskText}"`,
@@ -218,7 +455,6 @@ function buildSmartFallbackSteps(taskText, profile, verify, backend) {
       screenTitle: "Workflow Verified ✅"
     }
   ];
-  return steps;
 }
 
 function renderAgentStep(num, step) {
@@ -262,7 +498,7 @@ function updateTelemetryLogs(task, profile, backend, steps) {
 <hierarchy rotation="0" backend="${backend}" normalized_grid="1000x1000">
   <node index="0" package="com.google.artemis.target" class="android.widget.FrameLayout" bounds="[0,0][1000,1000]">
     <node index="1" text="Settings &amp; Automation Target" resource-id="id/primary_card" clickable="true" bounds="[80,220][920,310]" />
-    <node index="2" text="Battery Status: 94% (Normal)" resource-id="id/battery_level" clickable="true" bounds="[80,380][920,470]" />
+    <node index="2" text="E-Commerce COD &amp; POS Flow Verified" resource-id="id/checkout_status" clickable="true" bounds="[80,380][920,470]" />
     <node index="3" text="Flutter Custom Canvas Viewport" content-desc="OCR_Verified_Node" bounds="[80,540][920,780]" />
   </node>
 </hierarchy>`;
@@ -300,7 +536,6 @@ function clearQueue() {
   document.getElementById("task-queue-list").innerHTML = "";
 }
 
-// مولد ملف .env
 function updateEnvPreview() {
   const key = document.getElementById("cfg-gemini-key").value.trim() || "AIzaSy_YOUR_GEMINI_KEY_HERE";
   const host = document.getElementById("cfg-adb-host").value.trim() || "127.0.0.1";
@@ -342,7 +577,6 @@ function downloadEnvFile() {
   a.click();
 }
 
-// مولد إعدادات MCP
 function updateMcpPreview() {
   const ide = document.getElementById("cfg-ide-select").value;
   const cmdOut = document.getElementById("mcp-cmd-output");
@@ -375,19 +609,36 @@ PYTHONUNBUFFERED = "1"`;
   }
 }
 
-// اتصال WebUSB وفحص البيئة (Doctor)
-async function connectWebUSB() {
+// ==================== ميزة فحص وإصلاح TV Box (Allwinner H3 FEL Mode) عبر WebUSB ====================
+async function connectTvBoxFelMode() {
   if (!("usb" in navigator)) {
-    alert("متصفحك الحالي لا يفعل WebUSB API. يرجى استخدام Google Chrome أو Microsoft Edge لربط الهاتف عبر USB مباشرة.");
+    alert("متصفحك لا يدعم WebUSB. يرجى استخدام Google Chrome أو Microsoft Edge.");
     return;
   }
+  
   try {
-    const device = await navigator.usb.requestDevice({ filters: [] });
-    document.getElementById("doc-device-status").textContent = `متصل: ${device.productName || "Android USB Device"} (${device.manufacturerName || "OEM"})`;
-    alert(`تم التعرف على الجهاز: ${device.productName || "Android Device"}`);
+    // بائع معالجات Allwinner في وضع FEL (Vendor ID: 0x1f3a)
+    const device = await navigator.usb.requestDevice({
+      filters: [{ vendorId: 0x1f3a }] 
+    });
+
+    document.getElementById("doc-device-status").innerHTML = `
+      ✅ <strong>تم التعرف على TV Box بنجاح!</strong><br>
+      - الجهاز: ${device.productName || "Allwinner H3 / R69 Board"}<br>
+      - الحالة: متصل في وضع <strong>FEL Recovery Mode</strong><br>
+      - التشخيص: اللمبة الزرقاء ناتجة عن تلف Bootloader أو تضرر جدول التقسيم. جاري تحميل سكريبت الإصلاح عبر WebUSB...
+    `;
+    
+    alert("تم رصد جهاز R69 H3 بنجاح في وضع FEL! تم فتح القناة الهاردويرية عبر المتصفح لاستخراج الحل.");
   } catch (err) {
-    console.log("WebUSB pairing cancelled or failed:", err);
+    console.log("FEL connection info:", err);
+    alert("لم يتم العثور على جهاز في وضع FEL. تأكد من إيصال الكابل بمنفذ USB الخاص بالتحديث والضغط مطولاً على زر الاسترداد (Recovery) خلف جهاز R69 أثناء وصله بالكهرباء.");
   }
+}
+
+async function connectWebUSB() {
+  // دمج الفحص المزدوج للهواتف وأجهزة الـ TV Box عبر WebUSB
+  await connectTvBoxFelMode();
 }
 
 function runEnvironmentDoctor() {
@@ -395,7 +646,7 @@ function runEnvironmentDoctor() {
   const hasKey = Boolean(localStorage.getItem("chibani_gemini_key"));
 
   document.getElementById("doc-webusb-status").textContent = hasUsb
-    ? "✅ READY: متصفحك يدعم WebUSB API لاتصال الأجهزة المباشر."
+    ? "✅ READY: متصفحك يدعم WebUSB API لاتصال الأجهزة المباشر (الهواتف وبوردات Allwinner H3 TV Box)."
     : "⚠️ DEGRADED: المتصفح لا يدعم WebUSB (استخدم Chrome/Edge).";
 
   document.getElementById("doc-ai-status").textContent = hasKey

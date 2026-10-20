@@ -3,47 +3,50 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CHIBANI LOL AI — Next-Gen Android AI Automation Platform</title>
+  <title>CHIBANI LOL AI v2.0 — Ultra AI Automation, Python & Hardware Rescue Lab</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- الشريط العلوي (Header & View Switcher & Language Selector) -->
+  <!-- الشريط العلوي -->
   <header class="topbar">
     <div class="brand">
       <div class="logo-orb">⚡</div>
       <div>
-        <h1 class="brand-title">CHIBANI LOL AI</h1>
-        <span class="brand-subtitle" data-i18n="subtitle">منصة أتمتة واختبار أندرويد بالذكاء الاصطناعي — محرك ARTEMIS المتقدم</span>
+        <h1 class="brand-title">CHIBANI LOL AI <span class="v-tag">v2.0 ULTRA</span></h1>
+        <span class="brand-subtitle" data-i18n="subtitle">منصة الأتمتة الذكية، مختبر إنقاذ الهاردوير (TV Box/Android)، ومحرك Python الحي</span>
       </div>
     </div>
 
-    <!-- ① View Switcher -->
+    <!-- شريط التنقل بين الغرف الـ 6 -->
     <nav class="view-switcher">
       <button class="nav-btn active" data-tab="workspace" onclick="switchTab('workspace')">
-        <span>🚀</span> <span data-i18n="nav_workspace">غرفة العمليات (Workspace)</span>
+        <span>🚀</span> <span data-i18n="nav_workspace">غرفة الأتمتة (ARTEMIS)</span>
+      </button>
+      <button class="nav-btn" data-tab="rescue" onclick="switchTab('rescue')">
+        <span>🛠️</span> <span data-i18n="nav_rescue">إنقاذ TV Box والهاردوير</span>
+      </button>
+      <button class="nav-btn" data-tab="solver" onclick="switchTab('solver')">
+        <span>🧠</span> <span data-i18n="nav_solver">الباحث العميق وحلال المشاكل</span>
+      </button>
+      <button class="nav-btn" data-tab="python" onclick="switchTab('python')">
+        <span>🐍</span> <span data-i18n="nav_python">مختبر بايثون الحي (Pyodide)</span>
       </button>
       <button class="nav-btn" data-tab="prompts" onclick="switchTab('prompts')">
-        <span>🎯</span> <span data-i18n="nav_prompts">مكتبة السيناريوهات (Prompt Library)</span>
+        <span>🎯</span> <span data-i18n="nav_prompts">مكتبة السيناريوهات (12)</span>
       </button>
       <button class="nav-btn" data-tab="config" onclick="switchTab('config')">
         <span>⚙️</span> <span data-i18n="nav_config">الإعدادات و .env و MCP</span>
       </button>
-      <button class="nav-btn" data-tab="doctor" onclick="switchTab('doctor')">
-        <span>🩺</span> <span data-i18n="nav_doctor">الفحص الشامل (Doctor & WebUSB)</span>
-      </button>
-      <button class="nav-btn" data-tab="docs" onclick="switchTab('docs')">
-        <span>📚</span> <span data-i18n="nav_docs">المرجع الهندسي الشامل</span>
-      </button>
     </nav>
 
-    <!-- القائمة العلوية للغات وحالة الاتصال -->
+    <!-- الحالة واللغات -->
     <div class="top-actions">
       <div class="status-pill" id="api-status-pill">
         <span class="dot" id="api-dot"></span>
-        <span id="api-status-text" data-i18n="status_sim">الوضع الذكي جاهز</span>
+        <span id="api-status-text" data-i18n="status_sim">Free AI النشط ●</span>
       </div>
       <select id="lang-select" class="lang-select" onchange="changeLanguage(this.value)" aria-label="Language">
         <option value="ar">🇩🇿 العربية (AR)</option>
@@ -56,14 +59,13 @@
     </div>
   </header>
 
-  <!-- المحتوى الرئيسي -->
   <main class="main-container">
 
-    <!-- ==================== TAB 1: WORKSPACE ==================== -->
+    <!-- ==================== TAB 1: ARTEMIS WORKSPACE ==================== -->
     <section id="tab-workspace" class="tab-content active">
       <div class="workspace-grid">
 
-        <!-- ② Model & Replay + Live Device Screen -->
+        <!-- شاشة الجهاز وشبكة الإحداثيات 0-1000 -->
         <div class="panel device-panel">
           <div class="panel-header">
             <h2 data-i18n="panel_device_title">📱 شاشة الجهاز وشبكة الإحداثيات (0-1000)</h2>
@@ -75,7 +77,7 @@
               <div class="phone-statusbar">
                 <span>12:45</span>
                 <span>ARTEMIS Helper ●</span>
-                <span>🔋 94%</span>
+                <span>🔋 96%</span>
               </div>
 
               <div class="coord-grid" id="coord-grid"></div>
@@ -87,8 +89,8 @@
               <div class="phone-app-view" id="phone-app-view">
                 <div class="app-screen-header" id="screen-title">Android Home / Settings</div>
                 <div class="app-ui-elements" id="screen-elements">
-                  <div class="mock-ui-card" data-coord="500,260">⚙️ Settings (الإعدادات)</div>
-                  <div class="mock-ui-card" data-coord="500,420">🔋 Battery & Performance (البطارية)</div>
+                  <div class="mock-ui-card" data-coord="500,260">⚙️ Settings & System Control</div>
+                  <div class="mock-ui-card" data-coord="500,420">🔋 Battery & Power Diagnostics</div>
                   <div class="mock-ui-card" data-coord="500,580">🛒 Flutter E-Commerce & COD Store</div>
                   <div class="mock-ui-card" data-coord="500,740">🧾 Smart POS Cashier Terminal</div>
                 </div>
@@ -107,18 +109,19 @@
               <input type="checkbox" id="toggle-grid" checked onchange="toggleCoordGrid(this.checked)" />
               <span data-i18n="show_grid">إظهار شبكة الإحداثيات (0-1000)</span>
             </label>
-            <button class="btn-secondary btn-sm" onclick="connectWebUSB()" data-i18n="btn_connect_usb">🔌 ربط هاتف حقيقي (WebUSB)</button>
+            <button class="btn-secondary btn-sm" onclick="scanMultiSocWebUSB()" data-i18n="btn_connect_usb">🔌 ربط هاتف أو TV Box (WebUSB)</button>
+            <button class="btn-secondary btn-sm" onclick="exportPytestScript()" data-i18n="btn_export_py">🐍 تصدير المهمة كملف Pytest (.py)</button>
           </div>
         </div>
 
-        <!-- ③ Live Agent Stream & Reasoning -->
+        <!-- تدفق الوكيل الحي -->
         <div class="panel stream-panel">
           <div class="panel-header">
             <h2 data-i18n="panel_stream_title">🧠 تدفق الوكيل الحي (Live Agent Stream & Telemetry)</h2>
             <div class="stream-tabs">
-              <button class="mini-tab active" onclick="switchStreamView('steps')" data-i18n="tab_steps">خطوات الوكيل</button>
-              <button class="mini-tab" onclick="switchStreamView('xml')" data-i18n="tab_xml">شجرة الواجهة XML</button>
-              <button class="mini-tab" onclick="switchStreamView('logcat')" data-i18n="tab_logcat">سجل Logcat</button>
+              <button class="mini-tab active" onclick="switchStreamView('steps', this)" data-i18n="tab_steps">خطوات الوكيل</button>
+              <button class="mini-tab" onclick="switchStreamView('xml', this)" data-i18n="tab_xml">شجرة الواجهة XML</button>
+              <button class="mini-tab" onclick="switchStreamView('logcat', this)" data-i18n="tab_logcat">سجل Logcat</button>
             </div>
           </div>
 
@@ -152,7 +155,7 @@
 
           <div id="stream-steps-view" class="stream-box">
             <div class="empty-state" id="stream-empty" data-i18n="stream_empty_msg">
-              أدخل مهمة باللغة الطبيعية في شريط الأوامر بالأسفل أو اختر سيناريو من «مكتبة السيناريوهات» لمشاهدة دورة (Observe → Think → Safety Check → Act) مباشرة.
+              اكتب أي مهمة باللغة الطبيعية أو اضغط زر المايكروفون 🎙️ للتحدث صوتياً، وسيقوم الذكاء الاصطناعي المجاني بتوليد وتنفيذ خطوات الأتمتة فوراً!
             </div>
             <div id="agent-steps-list" class="steps-list"></div>
           </div>
@@ -160,16 +163,17 @@
           <pre id="stream-xml-view" class="stream-box code-view" style="display: none;"></pre>
           <pre id="stream-logcat-view" class="stream-box code-view" style="display: none;"></pre>
 
-          <!-- ④ Prompt Dock -->
+          <!-- شريط الأوامر مع دعم الصوت -->
           <div class="prompt-dock">
             <div class="preset-chips">
               <button class="chip" onclick="fillPreset('battery')" data-i18n="preset_battery">🔋 فحص نسبة البطارية</button>
               <button class="chip" onclick="fillPreset('flutter')" data-i18n="preset_flutter">🛒 اختبار متجر Flutter وإتمام السلة</button>
               <button class="chip" onclick="fillPreset('crossapp')" data-i18n="preset_crossapp">🗺️ سيناريو مشترك (Maps ← YouTube)</button>
-              <button class="chip chip-highlight" onclick="switchTab('prompts')" data-i18n="btn_open_library">🎯 فتح مكتبة الـ 12 سيناريو الجاهزة</button>
+              <button class="chip chip-highlight" onclick="switchTab('rescue')">🛠️ إنقاذ R69 TV Box (اللمبة الزرقاء)</button>
             </div>
             <div class="prompt-input-row">
-              <input type="text" id="task-prompt" oninput="updateLiveCliCommand()" data-i18n-placeholder="prompt_placeholder" placeholder="اكتب مهمتك باللغة الطبيعية... مثال: افتح الإعدادات، انتقل إلى البطارية وتحقق من النسبة" />
+              <button class="btn-voice" id="voice-btn" onclick="startVoiceCommand()" title="أمر صوتي (Voice Command)">🎙️</button>
+              <input type="text" id="task-prompt" oninput="updateLiveCliCommand()" data-i18n-placeholder="prompt_placeholder" placeholder="اكتب مهمتك باللغة الطبيعية أو تحدث بالمايكروفون..." />
               <button class="btn-primary" id="run-btn" onclick="executeTask()">
                 <span>▶</span> <span data-i18n="btn_run">تشغيل المهمة</span>
               </button>
@@ -177,7 +181,7 @@
           </div>
         </div>
 
-        <!-- ⑤ Task Queue & CLI Output -->
+        <!-- طابور المهام والـ CLI -->
         <div class="panel queue-panel">
           <div class="panel-header">
             <h2 data-i18n="panel_queue_title">📋 طابور المهام (FIFO Lock) والـ CLI</h2>
@@ -203,48 +207,223 @@
       </div>
     </section>
 
-    <!-- ==================== TAB 2: PROMPT LIBRARY (NEW!) ==================== -->
+    <!-- ==================== TAB 2: HARDWARE & TV BOX RESCUE LAB (NEW!) ==================== -->
+    <section id="tab-rescue" class="tab-content">
+      <div class="config-grid">
+        <!-- القسم الأيمن: فحص WebUSB + WebSerial UART + R69 Diagnostic -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2>🛠️ مختبر إنقاذ TV Box والهاردوير (Allwinner H3 / R69 / eMCP Lab)</h2>
+            <span class="badge">WebUSB + WebSerial</span>
+          </div>
+          <p class="panel-desc">
+            أداة متخصصة لقراءة المعالجات المتوقفة على اللمبة الزرقاء أو الشاشة السوداء عبر المتصفح مباشرة (تدعم معالجات Allwinner FEL و Rockchip و Amlogic و Qualcomm EDL وقارئ UART التسلسلي).
+          </p>
+
+          <!-- أزرار الاتصال المباشر بالهاردوير -->
+          <div class="rescue-actions-grid">
+            <button class="btn-primary" onclick="scanMultiSocWebUSB()">
+              🔌 فحص منفذ USB (FEL / Maskrom / EDL)
+            </button>
+            <button class="btn-secondary" onclick="connectWebSerialUART()">
+              📟 فتح بورت UART التسلسلي (115200 Baud)
+            </button>
+            <button class="btn-warning" onclick="loadR69BlueLightDiagnosis()">
+              🔵 تشخيص وحل مشكلة R69 H3 (اللمبة الزرقاء)
+            </button>
+          </div>
+
+          <!-- شاشة تيرمينال الـ UART والـ FEL الحية -->
+          <div class="cli-preview-box">
+            <div class="cli-header">
+              <span>📟 شاشة قراءة البوت والهاردوير (Live BootROM / FEL / UART Console)</span>
+              <button class="copy-btn" onclick="copyText('uart-console-output')">نسخ السجل</button>
+            </div>
+            <pre id="uart-console-output" class="uart-terminal">[SYSTEM READY] بانتظار توصيل الجهاز عبر WebUSB أو الضغط على زر "تشخيص وحل مشكلة R69 H3 (اللمبة الزرقاء)"...</pre>
+          </div>
+
+          <!-- محلل ملفات السوفتوير والدامب بالـ Hex -->
+          <div class="hex-inspector-box">
+            <h3>🔬 فاحص ملفات السوفتوير والـ Dump الحقيقي (Firmware .img / .bin Hex Inspector)</h3>
+            <p class="panel-desc">اختر أي ملف سوفتوير أو Bootloader من جهازك لفحص البصمة السداسية (Magic Bytes) والتأكد من توافقه مع معالج Allwinner H3 قبل التفليش:</p>
+            <input type="file" id="firmware-file-input" onchange="inspectFirmwareBinary(this)" />
+            <pre id="hex-inspector-output" class="code-view" style="margin-top:0.6rem; max-height:160px; overflow:auto;">لم يتم اختيار ملف بعد...</pre>
+          </div>
+        </div>
+
+        <!-- القسم الأيسر: الخطة الهندسية الكاملة لإحياء R69 Allwinner H3 -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2>⚡ الدليل الهندسي الشامل لإصلاح R69 (Allwinner H3 + eMCP LPDDR3)</h2>
+          </div>
+
+          <div id="r69-solution-steps" class="steps-list">
+            <div class="step-card safety-pass">
+              <div class="step-meta">
+                <span>السبب العلمي للوقوف على اللمبة الزرقاء في R69</span>
+                <span>SoC: Allwinner H3 (sun8iw7p1)</span>
+              </div>
+              <p>
+                في بوردة <strong>R69</strong> المزودة بذاكرة مدمجة <strong>eMCP (تجمع eMMC + LPDDR3 في آيسي واحد)</strong>، إضاءة اللمبة الزرقاء ثابته تعني أن دائرة الطاقة <strong>PMIC / Buck Converters (3.3V, 1.5V VDD-DLL, 1.2V VDD-CPU)</strong> سليمة، ولكن المعالج يفشل في المرحلة الأولى من الإقلاع (<strong>SPL / U-Boot</strong>) بسبب تلف جدول التقسيم في الـ eMMC أو عدم تطابق ملف تردد الرامات <code>DRAM_PARA (LPDDR3 vs DDR3)</code>.
+              </p>
+            </div>
+
+            <div class="step-card">
+              <div class="step-meta">
+                <span>الحل رقم 1: الحرق عبر كارت ميموري (PhoenixCard — بدون كمبيوتر)</span>
+                <span>الأضمن لـ eMCP</span>
+              </div>
+              <p>
+                1. استخدم كارت ميموري (MicroSD) بحجم 4GB أو 8GB (Class 10).<br>
+                2. افتح أداة <strong>PhoenixCard v3.1.0</strong>، اختر ملف السوفتوير الخاص بـ <code>R69_H3_LPDDR3_Android7.img</code>.<br>
+                3. اختر وضع الكتابة <strong>Product (وليس Startup!)</strong> ثم اضغط <strong>Burn</strong>.<br>
+                4. افصل الكهرباء عن R69، أدخل الكارت، وصل الكهرباء: ستبدأ اللمبة بالوميض ويتحول الشريط الأخضر على الشاشة حتى يكتمل التفليش، ثم انزع الكارت وأعد التشغيل.
+              </p>
+            </div>
+
+            <div class="step-card">
+              <div class="step-meta">
+                <span>الحل رقم 2: وضع FEL عبر كابل USB (USB Male-to-Male)</span>
+                <span>VID: 1F3A / PID: EFE8</span>
+              </div>
+              <p>
+                1. أدخل عوداً خشبياً داخل مدخل <strong>AV</strong> واضغط باستمرار على زر الـ Recovery الداخلي.<br>
+                2. وصل كابل USB بالمنفذ القريب من مدخل الطاقة (أو المنفذ الخلفي رقم 1) ثم اضغط فوق زر <strong>"فحص منفذ USB (FEL)"</strong> في موقعنا.<br>
+                3. إذا كانت ذاكرة الـ eMCP تمنع الدخول لوضع FEL، قم بعمل شورت خفيف (توصيل مؤقت بملقط) بين <strong>رجل CLK (أو D0) والأرضي GND</strong> على آيسي الـ eMCP لحظة توصيل الكابل لإجبار معالج H3 على الدخول في وضع <code>FEL Recovery</code> فوراً!
+              </p>
+            </div>
+
+            <div class="step-card">
+              <div class="step-meta">
+                <span>الحل رقم 3: الإقلاع الخارجي بنظام Armbian Linux من الكارت</span>
+                <span>فحص سلامة الرام والمعالج</span>
+              </div>
+              <p>
+                لحسم ما إذا كان العطل سوفتوير أم تلف في آيسي الـ eMCP نفسه: احرق نسخة <strong>Armbian Sunxi H3</strong> على كارت ميموري بواسطة برنامج Rufus أو BalenaEtcher وأدخلها في الجهاز؛ لأن معالج Allwinner H3 يعطي الأولوية للكارت (`SD0`) قبل الذاكرة الداخلية إذا فشل الـ eMMC، فإذا أقلع الجهاز على الكارت فالمعالج والرامات سليمان 100%!
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 3: DEEP AI TROUBLESHOOTER & OSINT SEARCH (NEW!) ==================== -->
+    <section id="tab-solver" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <h2>🧠 الباحث العميق وحلال المشاكل الخارق (Zero-Key Free AI + Deep OSINT Matrix)</h2>
+          <span class="badge">يعمل مجاناً بدون API Key</span>
+        </div>
+        <p class="panel-desc">
+          اكتب أي مشكلة تقنية، عطل بوردة إلكترونية، كود خطأ، أو موديل جهاز متوقف، وسيقوم الذكاء الاصطناعي المجاني بتحليل العطل جذرياً وتوليد مصفوفة بحث عميق في أكبر قواعد البيانات الهندسية (4PDA, Linux-Sunxi, XDA, GitHub).
+        </p>
+
+        <div class="solver-input-area">
+          <textarea id="solver-query" rows="3" placeholder="مثال: جهاز TV Box R69 معالج Allwinner H3 ذاكرة eMCP LPDDR3 متوقف على اللمبة الزرقاء ولا يتعرف عليه برنامج PhoenixSuit... أو اكتب أي مشكلة برمجية أو هاردوير"></textarea>
+          <div class="solver-btns">
+            <button class="btn-primary" id="btn-deep-solve" onclick="runDeepAiTroubleshooter()">
+              🚀 تحليل خارق بالذكاء الاصطناعي المجاني + توليد مصفوفة البحث العميق
+            </button>
+            <button class="btn-secondary" onclick="fillR69SolverPreset()">
+              📌 تعبئة مثال عطل R69 Allwinner H3 LPDDR3
+            </button>
+          </div>
+        </div>
+
+        <!-- روابط البحث العميق المباشرة (OSINT Matrix) -->
+        <div class="osint-matrix" id="osint-links-container" style="display:none;"></div>
+
+        <!-- نتيجة الذكاء الاصطناعي التفصيلية -->
+        <div class="cli-preview-box" style="margin-top:1rem;">
+          <div class="cli-header">
+            <span>🤖 التقرير الهندسي المفصل من الذكاء الاصطناعي (AI Deep Diagnosis Report)</span>
+            <button class="copy-btn" onclick="copyText('solver-ai-output')">نسخ التقرير</button>
+          </div>
+          <pre id="solver-ai-output" class="solver-output">اكتب مشكلتك بالأعلى واضغط على زر التحليل الخارق...</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 4: IN-BROWSER PYTHON 3 STUDIO (NEW!) ==================== -->
+    <section id="tab-python" class="tab-content">
+      <div class="config-grid">
+        <div class="panel">
+          <div class="panel-header">
+            <h2>🐍 محرك بايثون 3 الحي داخل المتصفح (Pyodide WebAssembly Studio)</h2>
+            <span class="badge" id="py-status-badge">Python 3 Ready</span>
+          </div>
+          <p class="panel-desc">
+            نفّذ كود بايثون حقيقي مباشرة داخل متصفحك بدون أي تنصيب! اختر أحد السكريبتات الجاهزة (حاسبة عناوين ذاكرة Allwinner FEL، أو مولد اختبارات ARTEMIS، أو محلل أعطال Logcat) أو اكتب كودك الخاص.
+          </p>
+
+          <div class="preset-chips" style="margin-bottom:0.8rem;">
+            <button class="chip" onclick="loadPythonTemplate('fel')">🔧 سكريبت حساب عناوين ذاكرة Allwinner H3 FEL & LPDDR3</button>
+            <button class="chip" onclick="loadPythonTemplate('artemis')">🤖 سكريبت توليد اختبار ARTEMIS Pytest آلي</button>
+            <button class="chip" onclick="loadPythonTemplate('logcat')">📊 سكريبت تحليل سجلات أعطال أندرويد (Logcat Parser)</button>
+          </div>
+
+          <textarea id="python-code-editor" class="code-editor" rows="14" spellcheck="false"></textarea>
+
+          <div style="display:flex; gap:0.6rem; margin-top:0.8rem;">
+            <button class="btn-primary" id="run-py-btn" onclick="runBrowserPython()">
+              ▶ تشغيل كود البايثون الآن (Run Python 3)
+            </button>
+            <button class="btn-secondary" onclick="downloadPythonFile()">
+              💾 تحميل الكود كملف (.py)
+            </button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <h2>💻 مخرجات تنفيذ البايثون (Python Standard Output Console)</h2>
+            <button class="copy-btn" onclick="copyText('python-output-console')">نسخ المخرجات</button>
+          </div>
+          <pre id="python-output-console" class="uart-terminal" style="height:430px;">اضغط على "تشغيل كود البايثون الآن" لرؤية النتائج الحسابية والبرمجية فوراً...</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 5: PROMPT LIBRARY (12 FLOWS) ==================== -->
     <section id="tab-prompts" class="tab-content">
       <div class="panel">
         <div class="panel-header prompt-lib-header">
           <div>
             <h2 data-i18n="lib_title">🎯 مكتبة الأوامر والسيناريوهات الجاهزة (ARTEMIS Prompt Library)</h2>
             <p class="panel-desc" data-i18n="lib_subtitle">
-              سيناريوهات اختبار احترافية مسبقة الضبط لتطبيقات المتاجر الإلكترونية (E-Commerce & COD)، أنظمة نقاط البيع (POS)، وتطبيقات Flutter & Custom Canvas.
+              12 سيناريو اختبار احترافياً مسبق الضبط لتطبيقات المتاجر الإلكترونية (E-Commerce & COD)، أنظمة نقاط البيع (POS)، وتطبيقات Flutter & Custom Canvas.
             </p>
           </div>
           <div class="lib-search-box">
-            <input type="text" id="prompt-search" oninput="filterPrompts()" data-i18n-placeholder="lib_search_placeholder" placeholder="🔍 ابحث عن سيناريو (مثال: سلة، Flutter، فاتورة، COD)..." />
+            <input type="text" id="prompt-search" oninput="filterPrompts()" placeholder="🔍 ابحث عن سيناريو (مثال: سلة، Flutter، فاتورة، COD)..." />
           </div>
         </div>
 
-        <!-- أزرار فلترة الفئات -->
         <div class="lib-categories">
-          <button class="cat-btn active" data-cat="all" onclick="setPromptCategory('all')" data-i18n="cat_all">🌟 جميع السيناريوهات (12)</button>
-          <button class="cat-btn" data-cat="ecommerce" onclick="setPromptCategory('ecommerce')" data-i18n="cat_ecommerce">🛒 المتاجر الإلكترونية و COD</button>
-          <button class="cat-btn" data-cat="pos" onclick="setPromptCategory('pos')" data-i18n="cat_pos">🧾 أنظمة نقاط البيع والكاشير (POS)</button>
-          <button class="cat-btn" data-cat="flutter" onclick="setPromptCategory('flutter')" data-i18n="cat_flutter">🦋 تطبيقات Flutter و Canvas</button>
-          <button class="cat-btn" data-cat="stress" onclick="setPromptCategory('stress')" data-i18n="cat_stress">🔄 المراقبة المستمرة و Cross-App</button>
+          <button class="cat-btn active" data-cat="all" onclick="setPromptCategory('all')">🌟 جميع السيناريوهات (12)</button>
+          <button class="cat-btn" data-cat="ecommerce" onclick="setPromptCategory('ecommerce')">🛒 المتاجر الإلكترونية و COD</button>
+          <button class="cat-btn" data-cat="pos" onclick="setPromptCategory('pos')">🧾 أنظمة نقاط البيع والكاشير (POS)</button>
+          <button class="cat-btn" data-cat="flutter" onclick="setPromptCategory('flutter')">🦋 تطبيقات Flutter و Canvas</button>
+          <button class="cat-btn" data-cat="stress" onclick="setPromptCategory('stress')">🔄 المراقبة المستمرة و Cross-App</button>
         </div>
 
-        <!-- شبكة بطاقات السيناريوهات -->
         <div class="prompt-cards-grid" id="prompt-cards-container"></div>
       </div>
     </section>
 
-    <!-- ==================== TAB 3: CONFIG & .ENV & MCP STUDIO ==================== -->
+    <!-- ==================== TAB 6: CONFIG, .ENV & MCP STUDIO ==================== -->
     <section id="tab-config" class="tab-content">
       <div class="config-grid">
         <div class="panel">
           <div class="panel-header">
-            <h2 data-i18n="cfg_env_title">🔑 إعدادات مزود الذكاء الاصطناعي ومولد ملف (.env)</h2>
+            <h2 data-i18n="cfg_env_title">🔑 إعدادات الذكاء الاصطناعي ومولد ملف (.env)</h2>
           </div>
-          <p class="panel-desc" data-i18n="cfg_env_desc">
-            أدخل مفتاح Gemini API المجاني (من Google AI Studio) لتفعيل التفكير الذكي الحقيقي داخل موقع CHIBANI LOL AI، وتوليد ملف .env جاهز لمستودعك.
+          <p class="panel-desc">
+            يعمل الموقع تلقائياً بالذكاء الاصطناعي المجاني المدمج بدون مفتاح! ويمكنك أيضاً إضافة مفتاح Google Gemini API المجاني الخاص بك لربطه مباشرة وتوليد ملف <code>.env</code>.
           </p>
 
           <div class="form-group">
-            <label>Google Gemini API Key (مجاني عبر aistudio.google.com):</label>
+            <label>Google Gemini API Key (اختياري — مجاني عبر aistudio.google.com):</label>
             <div class="input-with-btn">
               <input type="password" id="cfg-gemini-key" placeholder="AIzaSy..." oninput="updateEnvPreview()" />
               <button class="btn-primary" onclick="saveAndVerifyKey()" data-i18n="btn_save_key">حفظ وتفعيل</button>
@@ -262,7 +441,7 @@
             </div>
             <div class="form-group">
               <label>ADB_DEVICE_SERIAL:</label>
-              <input type="text" id="cfg-adb-serial" placeholder="اختياري (مثال: emulator-5554)" oninput="updateEnvPreview()" />
+              <input type="text" id="cfg-adb-serial" placeholder="مثال: emulator-5554" oninput="updateEnvPreview()" />
             </div>
           </div>
 
@@ -298,8 +477,8 @@
             <div class="cli-header">
               <span>📄 ملف .env الجاهز</span>
               <div>
-                <button class="copy-btn" onclick="copyText('env-output')" data-i18n="btn_copy">نسخ</button>
-                <button class="copy-btn" onclick="downloadEnvFile()" data-i18n="btn_download_env">تحميل .env</button>
+                <button class="copy-btn" onclick="copyText('env-output')">نسخ</button>
+                <button class="copy-btn" onclick="downloadEnvFile()">تحميل .env</button>
               </div>
             </div>
             <pre id="env-output"></pre>
@@ -310,8 +489,8 @@
           <div class="panel-header">
             <h2 data-i18n="cfg_mcp_title">🔌 مولد تكامل MCP مع محررات الأكواد الذكية (AI IDEs)</h2>
           </div>
-          <p class="panel-desc" data-i18n="cfg_mcp_desc">
-            اختر محرر الأكواد الذي تستخدمه للحصول على أوامر التثبيت التلقائي وملف التكوين اليدوي ومواصفات أدوات الـ MCP الخمس.
+          <p class="panel-desc">
+            اختر محرر الأكواد للحصول على أمر التثبيت الفوري وملف إعداد خادم MCP لربط ARTEMIS ببيئة البرمجة.
           </p>
 
           <div class="form-group">
@@ -330,7 +509,7 @@
           <div class="cli-preview-box">
             <div class="cli-header">
               <span>⚡ أمر التثبيت التلقائي الموصى به</span>
-              <button class="copy-btn" onclick="copyText('mcp-cmd-output')" data-i18n="btn_copy">نسخ</button>
+              <button class="copy-btn" onclick="copyText('mcp-cmd-output')">نسخ</button>
             </div>
             <pre id="mcp-cmd-output">uv run artemis mcp --install all</pre>
           </div>
@@ -338,7 +517,7 @@
           <div class="cli-preview-box">
             <div class="cli-header">
               <span>🛠️ إعداد JSON / TOML اليدوي لخادم MCP</span>
-              <button class="copy-btn" onclick="copyText('mcp-json-output')" data-i18n="btn_copy">نسخ</button>
+              <button class="copy-btn" onclick="copyText('mcp-json-output')">نسخ</button>
             </div>
             <pre id="mcp-json-output"></pre>
           </div>
@@ -354,84 +533,10 @@
       </div>
     </section>
 
-    <!-- ==================== TAB 4: DOCTOR & WEBUSB ==================== -->
-    <section id="tab-doctor" class="tab-content">
-      <div class="panel">
-        <div class="panel-header">
-          <h2 data-i18n="doc_title">🩺 طبيب البيئة وفحص الجاهزية (CHIBANI LOL AI Doctor & WebUSB Probe)</h2>
-          <button class="btn-primary" onclick="runEnvironmentDoctor()" data-i18n="btn_run_doctor">🔍 بدء الفحص الشامل الآن</button>
-        </div>
-
-        <div class="doctor-grid" id="doctor-results">
-          <div class="doc-card">
-            <h3>🌐 Browser & WebUSB API</h3>
-            <p id="doc-webusb-status">اضغط على "بدء الفحص الشامل" للتحقق من دعم المتصفح للاتصال المباشر بالهاتف.</p>
-          </div>
-          <div class="doc-card">
-            <h3>🤖 Gemini AI Engine</h3>
-            <p id="doc-ai-status">جاهز للفحص (يدعم الوضع التفاعلي المدمج + مفتاح Gemini API المباشر).</p>
-          </div>
-          <div class="doc-card">
-            <h3>📱 Connected USB Devices</h3>
-            <p id="doc-device-status">لم يتم إقران جهاز عبر WebUSB بعد.</p>
-          </div>
-          <div class="doc-card">
-            <h3>⚡ Render Cloud Readiness</h3>
-            <p id="doc-render-status">100% متوافق مع استضافة Render المجانية (Zero-Cost Static / Blueprint).</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ==================== TAB 5: ENGINEERING DOCS ==================== -->
-    <section id="tab-docs" class="tab-content">
-      <div class="panel docs-panel">
-        <h2 data-i18n="docs_header">📚 الدليل المرجعي الكامل لأوامر وخصائص Google ARTEMIS</h2>
-        <div class="docs-table-wrapper">
-          <table class="docs-table">
-            <thead>
-              <tr>
-                <th>المكون / الأمر</th>
-                <th>الكود / الصيغة</th>
-                <th>الشرح التقني</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><strong>التشغيل الفوري</strong></td>
-                <td><code>./start.sh</code> أو <code>.\start.bat</code></td>
-                <td>يثبت Python uv و ADB و scrcpy و FFmpeg ويبني واجهة الويب على المنفذ 8000.</td>
-              </tr>
-              <tr>
-                <td><strong>تشغيل نمط Flash</strong></td>
-                <td><code>uv run artemis run "Task" --profile flash</code></td>
-                <td>حلقة سريعة (3-5 ثوانٍ للخطوة) بدون LangGraph للمهام المباشرة.</td>
-              </tr>
-              <tr>
-                <td><strong>تشغيل نمط Pro الصارم</strong></td>
-                <td><code>uv run artemis run "Task" --profile pro --verification-level strict</code></td>
-                <td>تخطيط متعدد الفروع مع تحقق قبل كل نقرة ومراجعة شاملة عبر Checker.</td>
-              </tr>
-              <tr>
-                <td><strong>إدارة المساعد (Helper)</strong></td>
-                <td><code>uv run artemis helper install | status | uninstall</code></td>
-                <td>التحكم بتطبيق Accessibility Helper المسؤول عن قراءة شجرة الواجهة بسرعة.</td>
-              </tr>
-              <tr>
-                <td><strong>التشغيل عن بُعد (SSH)</strong></td>
-                <td><code>ssh -L 8000:localhost:8000 user@host</code></td>
-                <td>تمرير منفذ واجهة الويب للتحكم بهاتف متصل بخادم سحابي أو جهاز بعيد.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
   </main>
 
   <footer class="footer">
-    <span>© 2026 <strong>CHIBANI LOL AI</strong> — Built by Lotfi Chibani | Powered by Google ARTEMIS Architecture & Free Render Cloud</span>
+    <span>© 2026 <strong>CHIBANI LOL AI v2.0 Ultra</strong> — Engineered by Lotfi Chibani | Free AI + Pyodide Python + WebUSB Hardware Rescue</span>
   </footer>
 
   <script src="i18n.js"></script>

@@ -4,276 +4,299 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#060913" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <title>CHIBANI LOL AI v3.0 — OTG Flash, Memory Writer & ARTEMIS AI Platform</title>
+  <title>CHIBANI LOL AI v4.0 — Real OTG FEL Flasher & R69-EMCP v2.0 Hardware Tool</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- الشريط العلوي -->
   <header class="topbar">
     <div class="brand">
       <div class="logo-orb">⚡</div>
       <div>
-        <h1 class="brand-title">CHIBANI LOL AI <span class="v-tag">v3.0 OTG MASTER</span></h1>
-        <span class="brand-subtitle" data-i18n="subtitle">منصة التفليش والفرمطة وكتابة الذاكرة عبر الهاتف (OTG) + أتمتة ARTEMIS وبايثون</span>
+        <h1 class="brand-title">CHIBANI LOL AI <span class="v-tag">v4.0 REAL OTG</span></h1>
+        <span class="brand-subtitle">محرك التفليش الحقيقي لبوردة R69-EMCP v2.0 (Allwinner H3 336MHz LPDDR3) عبر WebUSB OTG</span>
       </div>
     </div>
 
-    <!-- شريط التنقل بين الغرف الـ 7 -->
     <nav class="view-switcher">
       <button class="nav-btn active" data-tab="otg" onclick="switchTab('otg')">
-        <span>📲</span> <span data-i18n="nav_otg">مركز OTG والفلاش والذاكرة</span>
+        <span>📲</span> <span>تفليش وفحص OTG الحقيقي</span>
+      </button>
+      <button class="nav-btn" data-tab="imgtool" onclick="switchTab('imgtool')">
+        <span>📦</span> <span>مفكك ومحلل روم 1.4GB (.img)</span>
       </button>
       <button class="nav-btn" data-tab="workspace" onclick="switchTab('workspace')">
-        <span>🚀</span> <span data-i18n="nav_workspace">غرفة الأتمتة (ARTEMIS)</span>
-      </button>
-      <button class="nav-btn" data-tab="rescue" onclick="switchTab('rescue')">
-        <span>🛠️</span> <span data-i18n="nav_rescue">مختبر R69 TV Box</span>
+        <span>🚀</span> <span>أتمتة ARTEMIS</span>
       </button>
       <button class="nav-btn" data-tab="solver" onclick="switchTab('solver')">
-        <span>🧠</span> <span data-i18n="nav_solver">حلال المشاكل الذكي</span>
+        <span>🧠</span> <span>التشخيص الذكي الفوري</span>
       </button>
       <button class="nav-btn" data-tab="python" onclick="switchTab('python')">
-        <span>🐍</span> <span data-i18n="nav_python">بايثون الحي (Pyodide)</span>
-      </button>
-      <button class="nav-btn" data-tab="prompts" onclick="switchTab('prompts')">
-        <span>🎯</span> <span data-i18n="nav_prompts">مكتبة السيناريوهات (12)</span>
-      </button>
-      <button class="nav-btn" data-tab="config" onclick="switchTab('config')">
-        <span>⚙️</span> <span data-i18n="nav_config">الإعدادات و MCP</span>
+        <span>🐍</span> <span>بايثون الحي (Pyodide)</span>
       </button>
     </nav>
 
-    <!-- الحالة واللغات -->
     <div class="top-actions">
       <div class="status-pill" id="otg-status-pill">
         <span class="dot" id="otg-dot"></span>
-        <span id="otg-status-text">OTG Ready ●</span>
+        <span id="otg-status-text">بانتظار USB OTG</span>
       </div>
-      <select id="lang-select" class="lang-select" onchange="changeLanguage(this.value)" aria-label="Language">
+      <select id="lang-select" class="lang-select" onchange="changeLanguage(this.value)">
         <option value="ar">🇩🇿 العربية (AR)</option>
-        <option value="en">🇺🇸 English (EN)</option>
         <option value="fr">🇫🇷 Français (FR)</option>
-        <option value="es">🇪🇸 Español (ES)</option>
-        <option value="tr">🇹🇷 Türkçe (TR)</option>
-        <option value="zh">🇨🇳 中文 (ZH)</option>
+        <option value="en">🇺🇸 English (EN)</option>
       </select>
     </div>
   </header>
 
   <main class="main-container">
 
-    <!-- ==================== TAB 1: MOBILE OTG FLASH, FORMAT & MEMORY WRITER STUDIO (NEW!) ==================== -->
+    <!-- ==================== TAB 1: REAL OTG FEL & FASTBOOT ENGINE ==================== -->
     <section id="tab-otg" class="tab-content active">
-      <!-- شريط حالة الارتباط عبر وصلة OTG -->
       <div class="otg-hero-banner">
         <div class="otg-hero-info">
-          <h2>📲 محرك الاتصال المباشر من الهاتف عبر وصلة OTG (Phone-to-Device WebUSB OTG Bridge)</h2>
+          <h2>📲 الاتصال الهاردويري المباشر ببوردة R69-EMCP v2.0 (Allwinner H3 — 0x1F3A:0xEFE8)</h2>
           <p>
-            اشبك وصلة <strong>OTG</strong> في هاتفك، ووصّل كابل الـ USB بجهاز <strong>TV Box R69 (Allwinner H3)</strong> أو بأي هاتف أندرويد، ثم اضغط على <strong>"اتصال عبر OTG الآن"</strong> للتحكم المباشر في المعالج والذاكرة والفرمطة والتفليش.
+            يرسل ويستقبل حزم <strong>AWUC / AWUS</strong> الحقيقية عبر منافذ <code>Bulk OUT / Bulk IN</code>. لا توجد أي محاكاة وهمية هنا: كل زر ينفذ نقل بايتات فعلي عبر كابل الـ OTG ويعرض الرد السداسي القادم من المعالج.
           </p>
         </div>
         <div class="otg-hero-btns">
-          <button class="btn-primary" onclick="connectOtgDevice()">
-            🔌 اتصال بالجهاز عبر OTG الآن
+          <button class="btn-primary" onclick="connectRealOtgDevice()">
+            🔌 إقران الجهاز الحقيقي عبر OTG (WebUSB)
           </button>
-          <button class="btn-warning" onclick="simulateOtgR69Connection()">
-            ⚡ محاكاة اتصال R69 H3 (تجربة حية)
+          <button class="btn-secondary" onclick="resetUsbInterface()">
+            🔄 إعادة تهيئة منفذ USB (Clear Halt)
           </button>
         </div>
       </div>
 
-      <!-- بطاقات معلومات الهاردوير المتصل عبر OTG -->
+      <!-- بطاقات القراءة الحقيقية من المعالج -->
       <div class="otg-telemetry-cards">
         <div class="otg-stat-card">
-          <span class="stat-label">حالة منفذ OTG (USB Host)</span>
-          <strong id="otg-conn-state" class="stat-val">بانتظار الإقران...</strong>
+          <span class="stat-label">حالة اتصال WebUSB الحقيقية</span>
+          <strong id="otg-conn-state" class="stat-val" style="color:#f59e0b;">غير متصل (اضغط إقران OTG)</strong>
         </div>
         <div class="otg-stat-card">
-          <span class="stat-label">المعالج والبروتوكول (SoC & Mode)</span>
+          <span class="stat-label">بصمة المعالج (Real FEL Version)</span>
           <strong id="otg-soc-name" class="stat-val">—</strong>
         </div>
         <div class="otg-stat-card">
-          <span class="stat-label">معرف الهاردوير (VID : PID)</span>
+          <span class="stat-label">معرف الجهاز (VID : PID)</span>
           <strong id="otg-vid-pid" class="stat-val">0x0000 : 0x0000</strong>
         </div>
         <div class="otg-stat-card">
-          <span class="stat-label">قنوات نقل البيانات (Bulk Endpoints)</span>
+          <span class="stat-label">نقاط النهاية النشطة (Endpoints)</span>
           <strong id="otg-endpoints" class="stat-val">IN: -- | OUT: --</strong>
         </div>
       </div>
 
       <div class="config-grid">
-        <!-- اللوحة اليمنى: الفرمطة، التفليش، وأوامر البوت لودر السريعة -->
+        <!-- اللوحة اليمنى: أوامر FEL الحقيقية وتفليش الملفات الكبيرة بكتل 64KB -->
         <div class="panel">
           <div class="panel-header">
-            <h2>🔥 عمليات الفرمطة والتفليش والإصلاح السريع عبر OTG</h2>
-            <span class="badge">Direct Bulk USB</span>
+            <h2>⚡ 1. أوامر المعالج الحقيقية (Real Sunxi-FEL & R69-EMCP v2.0 Operations)</h2>
+            <span class="badge">Real USB Packets</span>
           </div>
 
-          <p class="panel-desc">
-            اختر العملية المطلوبة لإرسال الحزم البرمجية مباشرة عبر كابل الـ OTG إلى الجهاز المتصل (يدعم أوامر <strong>Allwinner FEL</strong> وأوامر <strong>Android Fastboot</strong>):
-          </p>
-
-          <!-- أزرار العمليات الجاهزة -->
           <div class="otg-ops-grid">
-            <button class="otg-op-btn" onclick="executeOtgOperation('fel_verify')">
+            <button class="otg-op-btn" onclick="realFelVerifyDevice()">
               <span>🔍</span>
               <div>
-                <strong>فحص معالج Allwinner FEL</strong>
-                <small>قراءة Chip ID وحالة BootROM</small>
+                <strong>قراءة بصمة المعالج (FEL Verify)</strong>
+                <small>إرسال 0x0001 وقراءة 32 بايت من BROM</small>
               </div>
             </button>
 
-            <button class="otg-op-btn" onclick="executeOtgOperation('init_lpddr3')">
-              <span>⚡</span>
+            <button class="otg-op-btn" onclick="realInitR69Lpddr3()">
+              <span>🧠</span>
               <div>
-                <strong>تهيئة رامات LPDDR3 (R69 Fix)</strong>
-                <small>حقن تردد 576MHz لتجاوز اللمبة الزرقاء</small>
+                <strong>حقن إعداد رام R69 (LPDDR3 336MHz)</strong>
+                <small>كتابة ZQ=0x003939f9 DQS=0x00393839</small>
               </div>
             </button>
 
-            <button class="otg-op-btn danger-op" onclick="executeOtgOperation('format_userdata')">
+            <button class="otg-op-btn" onclick="realReadBromHeader()">
+              <span>📥</span>
+              <div>
+                <strong>سحب أول 256 بايت من SRAM (0x0000)</strong>
+                <small>قراءة حقيقية عبر FEL_READ (0x0103)</small>
+              </div>
+            </button>
+
+            <button class="otg-op-btn" onclick="realUnlockSramWatchdog()">
+              <span>🔓</span>
+              <div>
+                <strong>إيقاف Watchdog وتفعيل الكلوكس</strong>
+                <small>كتابة مسجلات CCU/PIO لبوردة R69</small>
+              </div>
+            </button>
+
+            <button class="otg-op-btn danger-op" onclick="realFastbootFormat()">
               <span>🧹</span>
               <div>
-                <strong>فرمطة شاملة وضبط مصنع</strong>
-                <small>مسح Userdata + Cache + Metadata</small>
+                <strong>مسح قطاعات Userdata & Cache</strong>
+                <small>يعمل في وضع Fastboot / U-Boot USB</small>
               </div>
             </button>
 
-            <button class="otg-op-btn" onclick="executeOtgOperation('reset_boot_header')">
-              <span>🛠️</span>
+            <button class="otg-op-btn" onclick="realFelExecJump()">
+              <span>🚀</span>
               <div>
-                <strong>إصلاح قطاع الإقلاع (eGON.BT0)</strong>
-                <small>إعادة بناء ترويسة U-Boot التالفة</small>
-              </div>
-            </button>
-
-            <button class="otg-op-btn" onclick="executeOtgOperation('read_partitions')">
-              <span>📋</span>
-              <div>
-                <strong>قراءة جدول تقسيم الذاكرة (eMCP)</strong>
-                <small>فحص قطاعات boot / recovery / system</small>
-              </div>
-            </button>
-
-            <button class="otg-op-btn" onclick="executeOtgOperation('reboot_device')">
-              <span>🔄</span>
-              <div>
-                <strong>إعادة تشغيل الجهاز فوراً</strong>
-                <small>إرسال أمر FEL Exec / Fastboot Reboot</small>
+                <strong>تنفيذ الإقلاع من العنوان (FEL_EXEC)</strong>
+                <small>إرسال أمر 0x0102 لتشغيل البوت لودر</small>
               </div>
             </button>
           </div>
 
-          <!-- قسم تفليش ملف سوفتوير أو بوت لودر عبر OTG -->
+          <!-- قسم التفليش الحقيقي للملفات الكبيرة (Stream Chunks) -->
           <div class="hex-inspector-box" style="margin-top:1rem;">
-            <h3>📦 تفليش ملف (.img / .bin) من الهاتف إلى الجهاز عبر OTG</h3>
-            <div class="form-row" style="margin-top:0.6rem;">
+            <h3>📦 2. التفليش الحقيقي للملفات عبر OTG (Real 64KB Chunk USB Streamer)</h3>
+            <p class="panel-desc" style="margin-bottom:0.5rem;">
+              <strong>هام جداً لبوردة R69:</strong> في وضع `FEL (0x1F3A:0xEFE8)`، المعالج يستقبل أولاً ملف البوت لودر (`boot0 / fes1 / u-boot-sunxi-with-spl.bin`) في الذاكرة ليفتح وصول الـ `eMCP (7472MB)`. إذا اخترت ملف الروم الكامل `1.4GB (.img)` سيقوم الموقع بفحص ترويسته واستخراج قسم البوت لودر منه أو بث الكتل الحقيقية إلى العنوان المحدد مع إظهار السرعة الفعلية (`KB/s`) والبايتات المنقولة:
+            </p>
+
+            <div class="form-row">
               <div class="form-group">
-                <label>القطاع المستهدف (Target Partition / Region):</label>
+                <label>وضع الكتابة والعنوان المستهدف:</label>
                 <select id="otg-flash-partition">
-                  <option value="fel_sram">Allwinner FEL SRAM (0x00000000 - SPL/Boot0)</option>
-                  <option value="fel_uboot">Allwinner FEL DRAM (0x4A000000 - U-Boot)</option>
-                  <option value="boot">Fastboot Partition: boot.img</option>
-                  <option value="recovery">Fastboot Partition: recovery.img</option>
-                  <option value="bootloader">Fastboot Partition: bootloader / u-boot</option>
-                  <option value="system">Fastboot Partition: system.img</option>
+                  <option value="0x00000000">1. FEL SRAM A1 (0x00000000 — حرق SPL / Boot0 / FES1 بحد أقصى 32KB)</option>
+                  <option value="0x4A000000">2. FEL DRAM (0x4A000000 — حرق U-Boot.bin بعد تهيئة LPDDR3)</option>
+                  <option value="0x40008000">3. FEL DRAM Kernel (0x40008000 — رفع boot.img للرام)</option>
+                  <option value="raw_stream">4. بث كامل للملف عبر Bulk OUT (Fastboot / LiveSuit Stream)</option>
                 </select>
               </div>
               <div class="form-group">
-                <label>اختر ملف الفلاش من هاتفك:</label>
-                <input type="file" id="otg-flash-file" onchange="prepareOtgFlashFile(this)" />
+                <label>اختر ملف (.img أو .bin) من هاتفك:</label>
+                <input type="file" id="otg-flash-file" onchange="onSelectRealFlashFile(this)" />
               </div>
             </div>
 
-            <!-- شريط تقدم التفليش -->
+            <div id="file-tech-summary" style="font-family:var(--font-mono); font-size:0.76rem; color:#38bdf8; margin-bottom:0.5rem;">
+              لم يتم اختيار ملف بعد...
+            </div>
+
             <div class="flash-progress-wrap">
               <div class="flash-progress-bar" id="otg-flash-progress" style="width: 0%;">0%</div>
             </div>
 
-            <button class="btn-primary" style="width:100%; margin-top:0.7rem;" onclick="startOtgFileFlashing()">
-              🚀 بدء تفليش وحرق الملف عبر OTG الآن
-            </button>
+            <div style="display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:0.74rem; color:#94a3b8; margin-top:0.35rem;">
+              <span id="flash-bytes-counter">0 MB / 0 MB</span>
+              <span id="flash-speed-counter">0 KB/s</span>
+              <span id="flash-eta-counter">الوقت: 0s</span>
+            </div>
+
+            <div style="display:flex; gap:0.6rem; margin-top:0.7rem;">
+              <button class="btn-primary" style="flex:2;" id="btn-start-flash" onclick="startRealOtgFlashing()">
+                🚀 بدء البث والتفليش الحقيقي عبر OTG
+              </button>
+              <button class="btn-secondary" style="flex:1; border-color:#f43f5e; color:#f43f5e;" onclick="cancelRealFlashing()">
+                ⏹ إيقاف البث
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- اللوحة اليسرى: كتابة الأكواد المباشرة داخل ذاكرة الجهاز (Memory Writer & Hex Injector) -->
+        <!-- اللوحة اليسرى: حقن وقراءة الذاكرة الحقيقية (Hex Read/Write) + سجل حزم الـ USB -->
         <div class="panel">
           <div class="panel-header">
-            <h2>🧬 كاتب وحاقن الأكواد داخل ذاكرة الجهاز (Direct Memory Hex & Code Writer)</h2>
-            <span class="badge">SRAM / DRAM / eMCP</span>
+            <h2>🧬 3. قراءة وكتابة الذاكرة الحقيقية (Real FEL Memory Read / Write / Exec)</h2>
+            <span class="badge">Hex Byte Stream</span>
           </div>
-
-          <p class="panel-desc">
-            اكتب أو ولّد بالذكاء الاصطناعي أوامر بايتات (`Hex Payload`) أو كود تهيئة معالج، ثم احقنه مباشرة في العنوان المحدد داخل ذاكرة الجهاز المتصل عبر OTG:
-          </p>
 
           <div class="form-row">
             <div class="form-group">
-              <label>عنوان الذاكرة المستهدف (Target Memory Hex Address):</label>
+              <label>عنوان الذاكرة المستهدف (Hex Address):</label>
               <select id="mem-target-addr" onchange="loadPresetMemoryPayload(this.value)">
-                <option value="0x00000000">0x00000000 — SRAM A1 (Allwinner H3 SPL / Boot0 Entry)</option>
-                <option value="0x00040000">0x00040000 — SRAM A2 (ARISC Power & Clocks Control)</option>
-                <option value="0x40000000">0x40000000 — DRAM Base (LPDDR3 1024MB Init Table)</option>
-                <option value="0x4A000000">0x4A000000 — U-Boot Main Payload Execution Address</option>
-                <option value="0x01C20800">0x01C20800 — PIO GPIO Controller (Blue/Red LED Control)</option>
+                <option value="0x00000000">0x00000000 — SRAM A1 (Boot0 / SPL Entry)</option>
+                <option value="0x00002000">0x00002000 — FES1 DRAM Init Buffer (R69 LPDDR3 336MHz)</option>
+                <option value="0x40000000">0x40000000 — DRAM Base (1024MB LPDDR3 Verification)</option>
+                <option value="0x4A000000">0x4A000000 — U-Boot Payload Address</option>
+                <option value="0x01C20800">0x01C20800 — PIO LED Controller (PL10 / PA15)</option>
               </select>
             </div>
             <div class="form-group">
-              <label>نوع العملية البرمجية:</label>
-              <select id="mem-op-mode">
-                <option value="write_exec">FEL_WRITE + FEL_EXEC (كتابة وتشغيل فوري)</option>
-                <option value="write_only">FEL_WRITE ONLY (كتابة في الذاكرة فقط)</option>
-                <option value="read_dump">FEL_READ DUMP (قراءة محتوى العنوان)</option>
+              <label>عدد البايتات عند القراءة (FEL_READ Length):</label>
+              <select id="mem-read-len">
+                <option value="64">64 Bytes</option>
+                <option value="128">128 Bytes</option>
+                <option value="256" selected>256 Bytes</option>
+                <option value="512">512 Bytes (1 Sector)</option>
               </select>
             </div>
           </div>
 
           <div class="preset-chips" style="margin-bottom:0.5rem;">
+            <button class="chip" onclick="loadPresetMemoryPayload('0x00002000')">⚡ بارامترات R69 LPDDR3 (336MHz / ZQ=003939f9)</button>
             <button class="chip" onclick="loadPresetMemoryPayload('0x00000000')">🧬 ترويسة eGON.BT0 SPL</button>
-            <button class="chip" onclick="loadPresetMemoryPayload('0x40000000')">⚡ كود تفعيل LPDDR3 576MHz</button>
-            <button class="chip" onclick="loadPresetMemoryPayload('0x01C20800')">💡 كود تبديل اللمبة الزرقاء/الحمراء GPIO</button>
-            <button class="chip chip-highlight" onclick="generateAiMemoryPatch()">🤖 توليد كود ذاكرة ذكي بالـ AI</button>
+            <button class="chip" onclick="loadPresetMemoryPayload('0x01C20800')">💡 تبديل مسجل اللمبة GPIO</button>
+            <button class="chip chip-highlight" onclick="generateCleanHexPatch()">🤖 توليد بايتات ARM32 صافية</button>
           </div>
 
           <textarea id="mem-hex-editor" class="code-editor" rows="5" spellcheck="false"></textarea>
 
-          <div style="display:flex; gap:0.6rem; margin-top:0.7rem;">
-            <button class="btn-primary" style="flex:2;" onclick="injectCodeToDeviceMemory()">
-              ⚡ كتابة وحقن الكود في ذاكرة الجهاز عبر OTG
+          <div style="display:flex; gap:0.55rem; margin-top:0.65rem;">
+            <button class="btn-primary" style="flex:1;" onclick="realWriteMemoryToDevice(false)">
+              📤 كتابة في الذاكرة (FEL_WRITE)
             </button>
-            <button class="btn-secondary" style="flex:1;" onclick="readMemoryFromDevice()">
-              📥 قراءة الذاكرة (Dump)
+            <button class="btn-warning" style="flex:1;" onclick="realWriteMemoryToDevice(true)">
+              ⚡ كتابة وتشغيل (WRITE + EXEC)
+            </button>
+            <button class="btn-secondary" style="flex:1;" onclick="realReadMemoryFromDevice()">
+              📥 قراءة حقيقية (FEL_READ)
             </button>
           </div>
 
-          <!-- شاشة سجل حزم الـ OTG المباشرة -->
-          <div class="cli-preview-box" style="margin-top:0.9rem;">
+          <div class="cli-preview-box" style="margin-top:0.85rem;">
             <div class="cli-header">
-              <span>📡 سجل نقل حزم OTG والذاكرة (Live USB OTG Packet & Memory Log)</span>
-              <button class="copy-btn" onclick="copyText('otg-live-log')">نسخ السجل</button>
+              <span>📡 سجل حزم WebUSB الحقيقي (Real USB Bulk Transfer Log)</span>
+              <div>
+                <button class="copy-btn" onclick="clearOtgLog()">مسح</button>
+                <button class="copy-btn" onclick="copyText('otg-live-log')">نسخ السجل</button>
+              </div>
             </div>
-            <pre id="otg-live-log" class="uart-terminal" style="height:195px;">[OTG ENGINE READY] قم بتوصيل الجهاز عبر وصلة OTG أو اضغط "محاكاة اتصال R69 H3" لتجربة الحقن والفرمطة والتفليش...</pre>
+            <pre id="otg-live-log" class="uart-terminal" style="height:230px;">[READY] قم بتوصيل بوردة R69 في وضع FEL عبر كابل OTG واضغط "إقران الجهاز الحقيقي عبر OTG"...</pre>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ==================== TAB 2: ARTEMIS WORKSPACE ==================== -->
+    <!-- ==================== TAB 2: 1.4GB IMAGEWTY / FIRMWARE INSPECTOR & EXTRACTOR ==================== -->
+    <section id="tab-imgtool" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <h2>📦 محلل ومفكك ملفات السوفتوير الكبيرة (Allwinner IMAGEWTY 1.4GB & Partition Table Analyzer)</h2>
+          <span class="badge">Zero-RAM Overflow</span>
+        </div>
+        <p class="panel-desc">
+          يفحص ملف `Android-H3-R69-EMCP-V2.0-root.img` (أو أي ملف سوفتوير بحجم 1.4GB+) مباشرة من هاتفك دون استهلاك الرام، ويستخرج لك منه أجزاء الإقلاع (`boot0` / `fes1` / `u-boot`) لتفليشها عبر FEL، كما يعرض جدول الـ 14 قطاعاً الخاص ببوردة R69-EMCP v2.0.
+        </p>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>اختر ملف الروم الكامل (`Android-H3-R69-EMCP-V2.0-root.img`):</label>
+            <input type="file" id="full-rom-input" onchange="analyzeFullAllwinnerImage(this)" />
+          </div>
+          <div class="form-group" style="display:flex; align-items:flex-end; gap:0.5rem;">
+            <button class="btn-primary" onclick="extractBoot0FromSelectedRom()">
+              ✂️ استخراج وتحميل قطاع الإقلاع (SPL/Boot0) من الروم
+            </button>
+          </div>
+        </div>
+
+        <pre id="rom-analysis-output" class="uart-terminal" style="height:320px; max-height:none;">اختر ملف الروم (.img) بالأعلى لقراءة ترويسة IMAGEWTY وجدول القطاعات الداخلي...</pre>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 3: ARTEMIS WORKSPACE ==================== -->
     <section id="tab-workspace" class="tab-content">
       <div class="workspace-grid">
-
         <div class="panel device-panel">
           <div class="panel-header">
-            <h2 data-i18n="panel_device_title">📱 شاشة الجهاز وشبكة الإحداثيات (0-1000)</h2>
+            <h2>📱 شاشة الجهاز وشبكة الإحداثيات (0-1000)</h2>
             <span class="badge" id="active-profile-badge">FLASH (3-5s)</span>
           </div>
-
           <div class="phone-wrapper">
             <div class="phone-frame" id="phone-screen">
               <div class="phone-statusbar">
@@ -281,416 +304,106 @@
                 <span>ARTEMIS OTG ●</span>
                 <span>🔋 96%</span>
               </div>
-
               <div class="coord-grid" id="coord-grid"></div>
-
               <div class="target-reticle" id="target-reticle" style="display: none;">
                 <span class="coord-label" id="coord-label">(500, 500)</span>
               </div>
-
-              <div class="phone-app-view" id="phone-app-view">
-                <div class="app-screen-header" id="screen-title">Android Home / Settings</div>
-                <div class="app-ui-elements" id="screen-elements">
-                  <div class="mock-ui-card" data-coord="500,260">⚙️ Settings & System Control</div>
-                  <div class="mock-ui-card" data-coord="500,420">🔋 Battery & Power Diagnostics</div>
-                  <div class="mock-ui-card" data-coord="500,580">🛒 Flutter E-Commerce & COD Store</div>
-                  <div class="mock-ui-card" data-coord="500,740">🧾 Smart POS Cashier Terminal</div>
+              <div class="phone-app-view">
+                <div class="app-screen-header" id="screen-title">Android System Control</div>
+                <div class="app-ui-elements">
+                  <div class="mock-ui-card">⚙️ Settings & Developer USB</div>
+                  <div class="mock-ui-card">🔋 Battery & PMU Diagnostics</div>
+                  <div class="mock-ui-card">🛒 Flutter E-Commerce COD Store</div>
+                  <div class="mock-ui-card">🧾 Smart POS Cashier Terminal</div>
                 </div>
               </div>
-
-              <div class="phone-navbar">
-                <span>◀</span>
-                <span>●</span>
-                <span>■</span>
-              </div>
+              <div class="phone-navbar"><span>◀</span><span>●</span><span>■</span></div>
             </div>
-          </div>
-
-          <div class="device-controls">
-            <label class="toggle-control">
-              <input type="checkbox" id="toggle-grid" checked onchange="toggleCoordGrid(this.checked)" />
-              <span data-i18n="show_grid">إظهار شبكة الإحداثيات (0-1000)</span>
-            </label>
-            <button class="btn-secondary btn-sm" onclick="connectOtgDevice()" data-i18n="btn_connect_usb">🔌 ربط هاتف أو TV Box (OTG)</button>
-            <button class="btn-secondary btn-sm" onclick="exportPytestScript()" data-i18n="btn_export_py">🐍 تصدير المهمة كملف Pytest (.py)</button>
           </div>
         </div>
 
         <div class="panel stream-panel">
           <div class="panel-header">
-            <h2 data-i18n="panel_stream_title">🧠 تدفق الوكيل الحي (Live Agent Stream & Telemetry)</h2>
-            <div class="stream-tabs">
-              <button class="mini-tab active" onclick="switchStreamView('steps', this)" data-i18n="tab_steps">خطوات الوكيل</button>
-              <button class="mini-tab" onclick="switchStreamView('xml', this)" data-i18n="tab_xml">شجرة الواجهة XML</button>
-              <button class="mini-tab" onclick="switchStreamView('logcat', this)" data-i18n="tab_logcat">سجل Logcat</button>
-            </div>
+            <h2>🧠 تدفق الوكيل الحي (ARTEMIS Live Agent Stream)</h2>
           </div>
-
           <div class="execution-toolbar">
             <div class="tool-group">
-              <label data-i18n="lbl_profile">نمط التنفيذ:</label>
+              <label>النمط:</label>
               <select id="exec-profile" onchange="updateProfileBadge()">
-                <option value="flash">⚡ Flash (Reactive 3-5s)</option>
-                <option value="pro">🛡️ Pro (Planner + Operator + Checker)</option>
+                <option value="flash">⚡ Flash (3-5s)</option>
+                <option value="pro">🛡️ Pro (Planner + Checker)</option>
               </select>
             </div>
-
             <div class="tool-group">
-              <label data-i18n="lbl_verify">مستوى التحقق (Pro):</label>
-              <select id="exec-verify" onchange="updateLiveCliCommand()">
-                <option value="final">final (افتراضي)</option>
-                <option value="checkpoints">checkpoints (المعالم)</option>
-                <option value="strict">strict (صارم جدا)</option>
-                <option value="off">off (معطل)</option>
-              </select>
-            </div>
-
-            <div class="tool-group">
-              <label data-i18n="lbl_locating">محرك الاستهداف:</label>
-              <select id="exec-backend">
-                <option value="auto">auto (Accessibility + Vision OCR)</option>
-                <option value="uiautomator">uiautomator (UIAutomator2)</option>
+              <label>التحقق:</label>
+              <select id="exec-verify">
+                <option value="strict">strict</option>
+                <option value="checkpoints">checkpoints</option>
+                <option value="final">final</option>
               </select>
             </div>
           </div>
 
           <div id="stream-steps-view" class="stream-box">
-            <div class="empty-state" id="stream-empty" data-i18n="stream_empty_msg">
-              اكتب أي مهمة باللغة الطبيعية أو اضغط زر المايكروفون 🎙️ للتحدث صوتياً، وسيقوم الذكاء الاصطناعي المجاني بتوليد وتنفيذ خطوات الأتمتة فوراً!
-            </div>
+            <div id="stream-empty">اكتب أمر الأتمتة بالأسفل واضغط تشغيل...</div>
             <div id="agent-steps-list" class="steps-list"></div>
           </div>
 
-          <pre id="stream-xml-view" class="stream-box code-view" style="display: none;"></pre>
-          <pre id="stream-logcat-view" class="stream-box code-view" style="display: none;"></pre>
-
           <div class="prompt-dock">
-            <div class="preset-chips">
-              <button class="chip" onclick="fillPreset('battery')" data-i18n="preset_battery">🔋 فحص نسبة البطارية</button>
-              <button class="chip" onclick="fillPreset('flutter')" data-i18n="preset_flutter">🛒 اختبار متجر Flutter وإتمام السلة</button>
-              <button class="chip" onclick="fillPreset('crossapp')" data-i18n="preset_crossapp">🗺️ سيناريو مشترك (Maps ← YouTube)</button>
-              <button class="chip chip-highlight" onclick="switchTab('otg')">📲 فتح مركز الفلاش والذاكرة عبر OTG</button>
-            </div>
             <div class="prompt-input-row">
-              <button class="btn-voice" id="voice-btn" onclick="startVoiceCommand()" title="أمر صوتي">🎙️</button>
-              <input type="text" id="task-prompt" oninput="updateLiveCliCommand()" data-i18n-placeholder="prompt_placeholder" placeholder="اكتب مهمتك باللغة الطبيعية أو تحدث بالمايكروفون..." />
-              <button class="btn-primary" id="run-btn" onclick="executeTask()">
-                <span>▶</span> <span data-i18n="btn_run">تشغيل المهمة</span>
-              </button>
+              <input type="text" id="task-prompt" placeholder="اكتب مهمة الأتمتة باللغة الطبيعية..." />
+              <button class="btn-primary" onclick="executeTask()">▶ تشغيل</button>
             </div>
           </div>
         </div>
 
         <div class="panel queue-panel">
           <div class="panel-header">
-            <h2 data-i18n="panel_queue_title">📋 طابور المهام (FIFO Lock) والـ CLI</h2>
-            <button class="btn-secondary btn-xs" onclick="clearQueue()" data-i18n="btn_clear">مسح السجل</button>
+            <h2>📋 سجل المهام والـ CLI</h2>
           </div>
-
-          <div class="mutex-status">
-            <span>🔒 DeviceExecutionLock:</span>
-            <strong id="lock-state">IDLE (متاح)</strong>
-          </div>
-
           <div class="queue-list" id="task-queue-list"></div>
-
           <div class="cli-preview-box">
-            <div class="cli-header">
-              <span>💻 Equivalent ARTEMIS CLI Command</span>
-              <button class="copy-btn" onclick="copyText('live-cli-cmd')" data-i18n="btn_copy">نسخ</button>
-            </div>
-            <pre id="live-cli-cmd">uv run artemis run "Open Settings, find Battery and tell me current level" --profile flash</pre>
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- ==================== TAB 3: HARDWARE & TV BOX RESCUE LAB ==================== -->
-    <section id="tab-rescue" class="tab-content">
-      <div class="config-grid">
-        <div class="panel">
-          <div class="panel-header">
-            <h2>🛠️ مختبر تشخيص R69 TV Box وقارئ UART / Hex</h2>
-            <span class="badge">Allwinner H3 + eMCP</span>
-          </div>
-          <p class="panel-desc">
-            أداة فحص سجلات الإقلاع التسلسلية (`UART 115200`) وفحص البصمة السداسية لملفات السوفتوير والـ Dump قبل تفليشها عبر OTG.
-          </p>
-
-          <div class="rescue-actions-grid">
-            <button class="btn-primary" onclick="connectOtgDevice()">
-              🔌 فحص منفذ USB OTG (FEL / Maskrom / EDL)
-            </button>
-            <button class="btn-secondary" onclick="connectWebSerialUART()">
-              📟 فتح بورت UART التسلسلي (115200 Baud)
-            </button>
-            <button class="btn-warning" onclick="loadR69BlueLightDiagnosis()">
-              🔵 تشخيص عطل R69 H3 (اللمبة الزرقاء)
-            </button>
-          </div>
-
-          <div class="cli-preview-box">
-            <div class="cli-header">
-              <span>📟 شاشة قراءة البوت والهاردوير (Live BootROM / FEL / UART Console)</span>
-              <button class="copy-btn" onclick="copyText('uart-console-output')">نسخ السجل</button>
-            </div>
-            <pre id="uart-console-output" class="uart-terminal">[SYSTEM READY] اضغط على زر "تشخيص عطل R69 H3 (اللمبة الزرقاء)" أو صل الجهاز عبر OTG...</pre>
-          </div>
-
-          <div class="hex-inspector-box">
-            <h3>🔬 فاحص ملفات السوفتوير والـ Dump الحقيقي (Firmware .img / .bin Hex Inspector)</h3>
-            <p class="panel-desc">اختر أي ملف سوفتوير من هاتفك لفحص البصمة السداسية (Magic Bytes) والتأكد من توافقه مع معالج Allwinner H3:</p>
-            <input type="file" id="firmware-file-input" onchange="inspectFirmwareBinary(this)" />
-            <pre id="hex-inspector-output" class="code-view" style="margin-top:0.6rem; max-height:160px; overflow:auto;">لم يتم اختيار ملف بعد...</pre>
-          </div>
-        </div>
-
-        <div class="panel">
-          <div class="panel-header">
-            <h2>⚡ الدليل الهندسي الشامل لإصلاح R69 (Allwinner H3 + eMCP LPDDR3)</h2>
-          </div>
-
-          <div class="steps-list">
-            <div class="step-card safety-pass">
-              <div class="step-meta">
-                <span>السبب العلمي للوقوف على اللمبة الزرقاء في R69</span>
-                <span>SoC: Allwinner H3 (sun8iw7p1)</span>
-              </div>
-              <p>
-                في بوردة <strong>R69</strong> المزودة بذاكرة مدمجة <strong>eMCP (تجمع eMMC + LPDDR3)</strong>، ثبات اللمبة الزرقاء يعني سلامة دائرة الطاقة، ولكن المعالج يفشل في تحميل <strong>U-Boot</strong> بسبب تلف قطاع الإقلاع أو عدم تطابق جدول تهيئة الرامات <code>DRAM_PARA (LPDDR3)</code>.
-              </p>
-            </div>
-
-            <div class="step-card">
-              <div class="step-meta">
-                <span>الحل المباشر من هاتفك عبر وصلة OTG (تبويب مركز OTG)</span>
-                <span>WebUSB FEL Mode</span>
-              </div>
-              <p>
-                1. اضغط بعود خشبي داخل منفذ <strong>AV</strong> على زر الـ Recovery، ووصل البوردة بهاتفك عبر وصلة <strong>OTG</strong>.<br>
-                2. من تبويب <strong>"📲 مركز OTG والفلاش والذاكرة"</strong> اضغط على <strong>"تهيئة رامات LPDDR3"</strong> ثم احقن كود <code>eGON.BT0</code> أو فلش ملف <code>u-boot-sunxi-with-spl.bin</code> مباشرة في العنوان <code>0x00000000</code>!
-              </p>
-            </div>
-
-            <div class="step-card">
-              <div class="step-meta">
-                <span>طريقة Test Point لإجبار آيسي eMCP على دخول وضع FEL</span>
-                <span>Hardware Short Pin</span>
-              </div>
-              <p>
-                إذا كانت ذاكرة الـ eMCP تمنع المعالج من الدخول في وضع FEL عبر الزر، قم بتوصيل نقطة <strong>CLK (أو D0)</strong> المجاورة لآيسي الـ eMCP مع الأرضي <strong>GND</strong> بملقط معدني لحظة توصيل كابل الـ OTG، وسيتعرف عليه هاتفك فوراً كـ <code>1F3A:EFE8</code>!
-              </p>
-            </div>
+            <pre id="live-cli-cmd">uv run artemis run "Open Settings" --profile flash</pre>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ==================== TAB 4: DEEP AI TROUBLESHOOTER ==================== -->
+    <!-- ==================== TAB 4: INSTANT SMART TROUBLESHOOTER ==================== -->
     <section id="tab-solver" class="tab-content">
       <div class="panel">
         <div class="panel-header">
-          <h2>🧠 الباحث العميق وحلال المشاكل الخارق (Zero-Key Free AI + Deep OSINT Matrix)</h2>
-          <span class="badge">يعمل مجاناً بدون API Key</span>
+          <h2>🧠 التشخيص الفوري لبوردة R69-EMCP v2.0 وجميع أعطال الـ OTG</h2>
+          <span class="badge">استجابة فورية بدون تجميد</span>
         </div>
-        <p class="panel-desc">
-          اكتب أي عطل بوردة إلكترونية أو خطأ تفليش OTG، وسيقوم الذكاء الاصطناعي المجاني بتوليد الحل الهندسي الدقيق ومصفوفة البحث العميق في (4PDA, Linux-Sunxi, XDA, GitHub).
-        </p>
-
         <div class="solver-input-area">
-          <textarea id="solver-query" rows="3" placeholder="اكتب تفاصيل المشكلة أو العطل هنا..."></textarea>
+          <textarea id="solver-query" rows="3" placeholder="اكتب سؤالك أو العطل هنا...">لماذا يفشل تفليش ملف 1.4GB دفعة واحدة في وضع FEL لبوردة R69-EMCP v2.0 وكيف أحيي الجهاز؟</textarea>
           <div class="solver-btns">
-            <button class="btn-primary" onclick="runDeepAiTroubleshooter()">
-              🚀 تحليل خارق بالذكاء الاصطناعي المجاني + توليد مصفوفة البحث العميق
-            </button>
-            <button class="btn-secondary" onclick="fillR69SolverPreset()">
-              📌 تعبئة مثال عطل R69 Allwinner H3 LPDDR3 عبر OTG
+            <button class="btn-primary" onclick="runInstantTroubleshooter()">
+              ⚡ عرض الحل الهندسي الدقيق فوراً
             </button>
           </div>
         </div>
-
-        <div class="osint-matrix" id="osint-links-container" style="display:none;"></div>
-
         <div class="cli-preview-box" style="margin-top:1rem;">
-          <div class="cli-header">
-            <span>🤖 التقرير الهندسي المفصل من الذكاء الاصطناعي</span>
-            <button class="copy-btn" onclick="copyText('solver-ai-output')">نسخ التقرير</button>
-          </div>
-          <pre id="solver-ai-output" class="solver-output">اكتب مشكلتك بالأعلى واضغط على زر التحليل الخارق...</pre>
+          <pre id="solver-ai-output" class="solver-output"></pre>
         </div>
       </div>
     </section>
 
-    <!-- ==================== TAB 5: IN-BROWSER PYTHON 3 STUDIO ==================== -->
+    <!-- ==================== TAB 5: LIVE PYTHON 3 ==================== -->
     <section id="tab-python" class="tab-content">
       <div class="config-grid">
         <div class="panel">
           <div class="panel-header">
-            <h2>🐍 محرك بايثون 3 الحي داخل المتصفح (Pyodide WebAssembly Studio)</h2>
+            <h2>🐍 مختبر بايثون 3 الحي (حساب بارامترات R69 LPDDR3 336MHz)</h2>
             <span class="badge" id="py-status-badge">Python 3 Ready</span>
           </div>
-          <p class="panel-desc">
-            شغّل كود بايثون 3 حقيقي على هاتفك لبناء حزم `AWUC` الخاصة ببروتوكول Allwinner FEL أو توليد اختبارات ARTEMIS!
-          </p>
-
-          <div class="preset-chips" style="margin-bottom:0.8rem;">
-            <button class="chip" onclick="loadPythonTemplate('fel')">🔧 سكريبت بناء حزم Allwinner H3 FEL USB</button>
-            <button class="chip" onclick="loadPythonTemplate('artemis')">🤖 سكريبت توليد اختبار ARTEMIS Pytest</button>
-            <button class="chip" onclick="loadPythonTemplate('logcat')">📊 سكريبت تحليل سجلات أعطال Bootloop</button>
-          </div>
-
-          <textarea id="python-code-editor" class="code-editor" rows="14" spellcheck="false"></textarea>
-
-          <div style="display:flex; gap:0.6rem; margin-top:0.8rem;">
-            <button class="btn-primary" onclick="runBrowserPython()">
-              ▶ تشغيل كود البايثون الآن (Run Python 3)
-            </button>
-            <button class="btn-secondary" onclick="downloadPythonFile()">
-              💾 تحميل الكود كملف (.py)
-            </button>
-          </div>
+          <textarea id="python-code-editor" class="code-editor" rows="13" spellcheck="false"></textarea>
+          <button class="btn-primary" style="margin-top:0.7rem;" onclick="runBrowserPython()">▶ تشغيل كود البايثون الآن</button>
         </div>
-
         <div class="panel">
-          <div class="panel-header">
-            <h2>💻 مخرجات تنفيذ البايثون (Python Standard Output Console)</h2>
-            <button class="copy-btn" onclick="copyText('python-output-console')">نسخ المخرجات</button>
-          </div>
-          <pre id="python-output-console" class="uart-terminal" style="height:430px;">اضغط على "تشغيل كود البايثون الآن" لرؤية النتائج الحسابية والبرمجية فوراً...</pre>
-        </div>
-      </div>
-    </section>
-
-    <!-- ==================== TAB 6: PROMPT LIBRARY (12 FLOWS) ==================== -->
-    <section id="tab-prompts" class="tab-content">
-      <div class="panel">
-        <div class="panel-header prompt-lib-header">
-          <div>
-            <h2 data-i18n="lib_title">🎯 مكتبة الأوامر والسيناريوهات الجاهزة (ARTEMIS Prompt Library)</h2>
-            <p class="panel-desc" data-i18n="lib_subtitle">
-              12 سيناريو اختبار احترافياً لتطبيقات المتاجر الإلكترونية (COD)، نقاط البيع (POS)، وتطبيقات Flutter.
-            </p>
-          </div>
-          <div class="lib-search-box">
-            <input type="text" id="prompt-search" oninput="filterPrompts()" placeholder="🔍 ابحث عن سيناريو..." />
-          </div>
-        </div>
-
-        <div class="lib-categories">
-          <button class="cat-btn active" data-cat="all" onclick="setPromptCategory('all')">🌟 جميع السيناريوهات (12)</button>
-          <button class="cat-btn" data-cat="ecommerce" onclick="setPromptCategory('ecommerce')">🛒 المتاجر الإلكترونية و COD</button>
-          <button class="cat-btn" data-cat="pos" onclick="setPromptCategory('pos')">🧾 أنظمة نقاط البيع والكاشير (POS)</button>
-          <button class="cat-btn" data-cat="flutter" onclick="setPromptCategory('flutter')">🦋 تطبيقات Flutter و Canvas</button>
-          <button class="cat-btn" data-cat="stress" onclick="setPromptCategory('stress')">🔄 المراقبة المستمرة و Cross-App</button>
-        </div>
-
-        <div class="prompt-cards-grid" id="prompt-cards-container"></div>
-      </div>
-    </section>
-
-    <!-- ==================== TAB 7: CONFIG, .ENV & MCP STUDIO ==================== -->
-    <section id="tab-config" class="tab-content">
-      <div class="config-grid">
-        <div class="panel">
-          <div class="panel-header">
-            <h2 data-i18n="cfg_env_title">🔑 إعدادات الذكاء الاصطناعي ومولد ملف (.env)</h2>
-          </div>
-          <div class="form-group">
-            <label>Google Gemini API Key (اختياري — الموقع يعمل مجاناً بدونه):</label>
-            <div class="input-with-btn">
-              <input type="password" id="cfg-gemini-key" placeholder="AIzaSy..." oninput="updateEnvPreview()" />
-              <button class="btn-primary" onclick="saveAndVerifyKey()" data-i18n="btn_save_key">حفظ وتفعيل</button>
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>ADB_HOST:</label>
-              <input type="text" id="cfg-adb-host" value="127.0.0.1" oninput="updateEnvPreview()" />
-            </div>
-            <div class="form-group">
-              <label>ADB_PORT:</label>
-              <input type="text" id="cfg-adb-port" value="5037" oninput="updateEnvPreview()" />
-            </div>
-            <div class="form-group">
-              <label>ADB_DEVICE_SERIAL:</label>
-              <input type="text" id="cfg-adb-serial" placeholder="emulator-5554" oninput="updateEnvPreview()" />
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>ARTEMIS_DEFAULT_PROFILE:</label>
-              <select id="cfg-def-profile" onchange="updateEnvPreview()">
-                <option value="flash">flash</option>
-                <option value="pro">pro</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>ARTEMIS_HIERARCHY_BACKEND:</label>
-              <select id="cfg-backend" onchange="updateEnvPreview()">
-                <option value="auto">auto</option>
-                <option value="uiautomator">uiautomator</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-row">
-            <label class="toggle-control">
-              <input type="checkbox" id="cfg-auto-helper" checked onchange="updateEnvPreview()" />
-              <span>ARTEMIS_HELPER_AUTO_INSTALL=true</span>
-            </label>
-            <label class="toggle-control">
-              <input type="checkbox" id="cfg-keep-awake" checked onchange="updateEnvPreview()" />
-              <span>ARTEMIS_KEEP_DEVICE_AWAKE=true</span>
-            </label>
-          </div>
-
-          <div class="cli-preview-box">
-            <div class="cli-header">
-              <span>📄 ملف .env الجاهز</span>
-              <div>
-                <button class="copy-btn" onclick="copyText('env-output')">نسخ</button>
-                <button class="copy-btn" onclick="downloadEnvFile()">تحميل .env</button>
-              </div>
-            </div>
-            <pre id="env-output"></pre>
-          </div>
-        </div>
-
-        <div class="panel">
-          <div class="panel-header">
-            <h2 data-i18n="cfg_mcp_title">🔌 مولد تكامل MCP مع محررات الأكواد الذكية (AI IDEs)</h2>
-          </div>
-          <div class="form-group">
-            <label data-i18n="lbl_select_ide">اختر بيئة التطوير (IDE):</label>
-            <select id="cfg-ide-select" onchange="updateMcpPreview()">
-              <option value="all">جميع المحررات المدعومة (Install All)</option>
-              <option value="claude">Claude Code / Claude Desktop</option>
-              <option value="cursor">Cursor IDE</option>
-              <option value="antigravity">Google Antigravity / Jetski</option>
-              <option value="codex">OpenAI Codex CLI</option>
-              <option value="windsurf">Windsurf IDE</option>
-              <option value="vscode">VS Code / Cline / Roo Code</option>
-            </select>
-          </div>
-
-          <div class="cli-preview-box">
-            <div class="cli-header">
-              <span>⚡ أمر التثبيت التلقائي</span>
-              <button class="copy-btn" onclick="copyText('mcp-cmd-output')">نسخ</button>
-            </div>
-            <pre id="mcp-cmd-output">uv run artemis mcp --install all</pre>
-          </div>
-
-          <div class="cli-preview-box">
-            <div class="cli-header">
-              <span>🛠️ إعداد JSON اليدوي لخادم MCP</span>
-              <button class="copy-btn" onclick="copyText('mcp-json-output')">نسخ</button>
-            </div>
-            <pre id="mcp-json-output"></pre>
-          </div>
+          <div class="panel-header"><h2>💻 مخرجات بايثون</h2></div>
+          <pre id="python-output-console" class="uart-terminal" style="height:360px;"></pre>
         </div>
       </div>
     </section>
@@ -698,7 +411,7 @@
   </main>
 
   <footer class="footer">
-    <span>© 2026 <strong>CHIBANI LOL AI v3.0 OTG Master</strong> — Engineered by Lotfi Chibani | WebUSB OTG Flashing + Memory Hex Injector + Free AI</span>
+    <span>© 2026 <strong>CHIBANI LOL AI v4.0</strong> — Real WebUSB OTG Engine for R69-EMCP v2.0 Allwinner H3</span>
   </footer>
 
   <script src="i18n.js"></script>

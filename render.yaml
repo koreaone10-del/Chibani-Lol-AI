@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: chibani-lol-ai
+    env: static
+    buildCommand: echo "Building CHIBANI LOL AI Static Platform..."
+    staticPublishPath: .
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

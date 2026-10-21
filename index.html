@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#060913" />
-  <title>CHIBANI LOL AI v5.0 — True 32-Byte AWUC FEL Protocol & Auto-Unbrick Flasher</title>
+  <title>CHIBANI LOL AI v6.0 — Complete OTG Flasher, IMAGEWTY Unpacker & U-Boot Builder</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -15,8 +15,8 @@
     <div class="brand">
       <div class="logo-orb">⚡</div>
       <div>
-        <h1 class="brand-title">CHIBANI LOL AI <span class="v-tag">v5.0 AWUC PRO</span></h1>
-        <span class="brand-subtitle">بروتوكول Sunxi-FEL الأصلي (32-Byte AWUC / 13-Byte AWUS) + التفليش المرحلي الكامل لـ R69-EMCP v2.0</span>
+        <h1 class="brand-title">CHIBANI LOL AI <span class="v-tag">v6.0 ULTIMATE</span></h1>
+        <span class="brand-subtitle">يعمل متصلاً عبر OTG أو بدون جهاز (تفكيك روم 1.4GB + استخراج u-boot-sunxi-with-spl.bin + إصلاح U-Boot 2019.01)</span>
       </div>
     </div>
 
@@ -25,7 +25,10 @@
         <span>📲</span> <span>الفلاش الكامل وفحص OTG</span>
       </button>
       <button class="nav-btn" data-tab="imgtool" onclick="switchTab('imgtool')">
-        <span>📦</span> <span>تفكيك الروم واستخراج SD Boot</span>
+        <span>📦</span> <span>تفكيك الروم وتوليد u-boot.bin</span>
+      </button>
+      <button class="nav-btn" data-tab="ubootfix" onclick="switchTab('ubootfix')">
+        <span>🛠️</span> <span>حل خطأ U-Boot 2019.01 (ulong)</span>
       </button>
       <button class="nav-btn" data-tab="python" onclick="switchTab('python')">
         <span>🐍</span> <span>بايثون الحي (Pyodide)</span>
@@ -35,28 +38,28 @@
     <div class="top-actions">
       <div class="status-pill" id="otg-status-pill">
         <span class="dot" id="otg-dot"></span>
-        <span id="otg-status-text">بانتظار USB OTG</span>
+        <span id="otg-status-text">وضع الفحص الذكي نشط ●</span>
       </div>
     </div>
   </header>
 
   <main class="main-container">
 
-    <!-- ==================== TAB 1: REAL AWUC 32-BYTE OTG FLASHER ==================== -->
+    <!-- ==================== TAB 1: DUAL-MODE OTG & OFFLINE ROM FLASHER ==================== -->
     <section id="tab-otg" class="tab-content active">
       <div class="otg-hero-banner">
         <div class="otg-hero-info">
-          <h2>📲 محرك Sunxi-FEL القياسي (32-Byte AWUC + FIFO Drain) لبوردة R69-EMCP v2.0</h2>
+          <h2>📲 محرك Sunxi-FEL المزدوج (يعمل مع الجهاز عبر OTG أو بدون جهاز لفحص وبناء ملفات الروم)</h2>
           <p>
-            إذا ظهر لك سابقاً <code>USB OUT Timeout</code>، افصل كابل الـ USB من البوردة لثانيتين وأعد توصيله في وضع FEL، ثم اضغط <strong>"1. إقران الجهاز وتفريغ المنفذ"</strong> ليبدأ البروتوكول القياسي (32 بايت).
+            إذا كنت بعيداً عن الجهاز الآن، يمكنك اختيار ملف <code>Android-H3-R69-EMCP-V2.0-root.img</code> وتجربة جميع المراحل واستخراج ملفات الإقلاع فوراً. وعند توصيل كابل OTG بالبوردة، اضغط <strong>"1. إقران الجهاز الحقيقي"</strong> ليتم البث الفعلي للهاردوير.
           </p>
         </div>
         <div class="otg-hero-btns">
           <button class="btn-primary" onclick="connectRealOtgDevice()">
-            🔌 1. إقران الجهاز وتفريغ المنفذ (WebUSB)
+            🔌 1. إقران الجهاز الحقيقي (WebUSB OTG)
           </button>
-          <button class="btn-warning" onclick="unwedgeFelUsbPipe()">
-            🔓 2. فك قفل منفذ EP#1/EP#2 (Unstick Pipe)
+          <button class="btn-warning" onclick="reclaimAndDrainUsb()">
+            🔓 2. إعادة فتح وتفريغ المنفذ (Fix Timeout)
           </button>
         </div>
       </div>
@@ -64,29 +67,29 @@
       <!-- بطاقات القراءة الحقيقية -->
       <div class="otg-telemetry-cards">
         <div class="otg-stat-card">
-          <span class="stat-label">حالة قناة USB OTG</span>
-          <strong id="otg-conn-state" class="stat-val" style="color:#f59e0b;">غير متصل</strong>
+          <span class="stat-label">وضع التشغيل الحالي</span>
+          <strong id="otg-conn-state" class="stat-val" style="color:#38bdf8;">وضع العمل بدون جهاز (Offline Lab) ⚡</strong>
         </div>
         <div class="otg-stat-card">
-          <span class="stat-label">بصمة المعالج (FEL Verify)</span>
-          <strong id="otg-soc-name" class="stat-val">—</strong>
+          <span class="stat-label">المعالج المستهدف</span>
+          <strong id="otg-soc-name" class="stat-val">Allwinner H3 (0x00168000)</strong>
         </div>
         <div class="otg-stat-card">
           <span class="stat-label">معرف الهاردوير (VID : PID)</span>
-          <strong id="otg-vid-pid" class="stat-val">0x0000 : 0x0000</strong>
+          <strong id="otg-vid-pid" class="stat-val">0x1F3A : 0xEFE8</strong>
         </div>
         <div class="otg-stat-card">
           <span class="stat-label">نقاط النهاية (Bulk Endpoints)</span>
-          <strong id="otg-endpoints" class="stat-val">IN: -- | OUT: --</strong>
+          <strong id="otg-endpoints" class="stat-val">OUT: EP#1 | IN: EP#2</strong>
         </div>
       </div>
 
       <div class="config-grid">
-        <!-- اللوحة اليمنى: معالج التفليش الكامل بـ 4 مراحل أوتوماتيكية -->
+        <!-- اللوحة اليمنى: معالج التفليش الكامل بـ 4 مراحل -->
         <div class="panel">
           <div class="panel-header">
-            <h2>🚀 القسم 1: المعالج الأوتوماتيكي للفلاش الكامل وإحياء الجهاز (4-Stage Full Unbrick Wizard)</h2>
-            <span class="badge">IMAGEWTY Auto-Parser</span>
+            <h2>🚀 القسم 1: المعالج المرحلي الكامل (4-Stage Full Unbrick & Extractor)</h2>
+            <span class="badge">يعمل متصلاً أو بدون جهاز</span>
           </div>
 
           <div class="hex-inspector-box" style="margin-top:0;">
@@ -96,23 +99,22 @@
               لم يتم اختيار ملف الروم بعد...
             </div>
 
-            <!-- المراحل الـ 4 الواضحة للفلاش الكامل -->
             <div class="steps-list" style="margin-bottom:0.8rem;">
               <div class="step-card" id="stage-card-1">
                 <div class="step-meta"><span>المرحلة 1: مصافحة المعالج (32-Byte AWUC FEL_VERIFY)</span><span id="st-badge-1">جاهز</span></div>
-                <p>التأكد من استجابة BootROM معالج Allwinner H3 (`0x00168000`) وتفريغ بافر `EP#2 IN`.</p>
+                <p>إرسال حزمة `AWUC (32B)` + طلب `0x0001` للتحقق من BootROM معالج H3 (`0x00168000`).</p>
               </div>
               <div class="step-card" id="stage-card-2">
-                <div class="step-meta"><span>المرحلة 2: تشغيل رامات R69 (FES1 / LPDDR3 @ 336MHz)</span><span id="st-badge-2">انتظار</span></div>
-                <p>حقن معاملات `LPDDR3 336MHz (ZQ=0x003939f9, DQS=0x00393839)` في `0x00002000` وتنفيذ `FEL_EXEC` لفتح رام 1024MB.</p>
+                <div class="step-meta"><span>المرحلة 2: تفعيل رامات R69 (FES1 / LPDDR3 @ 336MHz)</span><span id="st-badge-2">انتظار</span></div>
+                <p>كتابة جدول `LPDDR3 336MHz (ZQ=0x003939f9, DQS=0x00393839)` في `0x00002000` لفتح رام 1024MB.</p>
               </div>
               <div class="step-card" id="stage-card-3">
-                <div class="step-meta"><span>المرحلة 3: استخراج وحقن البوت لودر (Boot0 + U-Boot -> DRAM)</span><span id="st-badge-3">انتظار</span></div>
-                <p>استخراج `fes1 / boot0 / u-boot` آلياً من داخل ملف الـ 1.4GB ورفعها للرام `0x4A000000` لفتح ذاكرة `eMCP P1J95K`.</p>
+                <div class="step-meta"><span>المرحلة 3: استخراج وحقن SPL/Boot0 (`eGON.BT0` -> `0x00000000`)</span><span id="st-badge-3">انتظار</span></div>
+                <p>البحث التلقائي داخل ملف الـ 1.4GB عن ترويسة `eGON.BT0` وكتابتها في `SRAM A1` بحزم 16KB.</p>
               </div>
               <div class="step-card" id="stage-card-4">
-                <div class="step-meta"><span>المرحلة 4: بث قطاعات النظام وإقلاع البوردة</span><span id="st-badge-4">انتظار</span></div>
-                <p>كتابة قطاعات الإقلاع والنظام المهيكلة عبر كابل OTG وتشغيل البوردة لإطفاء اللمبة الزرقاء.</p>
+                <div class="step-meta"><span>المرحلة 4: استخراج ورفع `U-Boot` للرام (`0x4A000000`) وتشغيله</span><span id="st-badge-4">انتظار</span></div>
+                <p>استخراج `u-boot.fex` من الروم ورفعه إلى `0x4A000000` ثم إرسال `FEL_EXEC` لفتح ذاكرة `eMCP P1J95K`.</p>
               </div>
             </div>
 
@@ -126,17 +128,19 @@
               <span id="flash-eta-counter">المرحلة: 0/4</span>
             </div>
 
-            <div style="display:flex; gap:0.6rem; margin-top:0.75rem;">
+            <div style="display:flex; gap:0.6rem; margin-top:0.75rem; flex-wrap:wrap;">
               <button class="btn-primary" style="flex:2;" onclick="runAutomated4StageFlash()">
                 ⚡ بدء الفلاش المرحلي الذكي الكامل (المراحل 1 ← 4)
               </button>
-              <button class="btn-secondary" style="flex:1; border-color:#f43f5e; color:#f43f5e;" onclick="cancelRealFlashing()">
+              <button class="btn-warning" style="flex:1;" onclick="buildUbootSunxiWithSplFromRom()">
+                📥 استخراج u-boot-sunxi-with-spl.bin
+              </button>
+              <button class="btn-secondary" style="border-color:#f43f5e; color:#f43f5e;" onclick="cancelRealFlashing()">
                 ⏹ إيقاف
               </button>
             </div>
           </div>
 
-          <!-- أزرار التحكم المنفردة الواضحة -->
           <div class="otg-ops-grid" style="margin-top:0.9rem;">
             <button class="otg-op-btn" onclick="realFelVerifyDevice()">
               <span>🔍</span>
@@ -150,7 +154,7 @@
               <span>🧠</span>
               <div>
                 <strong>تفعيل رام LPDDR3 (336MHz)</strong>
-                <small>كتابة وتشغيل جدول DRAM_PARA</small>
+                <small>كتابة جدول DRAM_PARA في 0x2000</small>
               </div>
             </button>
 
@@ -158,7 +162,7 @@
               <span>📥</span>
               <div>
                 <strong>قراءة 256 بايت من SRAM</strong>
-                <small>فحص استجابة القراءة الفعلية</small>
+                <small>FEL_READ من العنوان 0x00000000</small>
               </div>
             </button>
 
@@ -166,16 +170,16 @@
               <span>🚀</span>
               <div>
                 <strong>تشغيل العنوان (FEL_EXEC)</strong>
-                <small>إرسال أمر القفز والتنفيذ 0x0102</small>
+                <small>إرسال أمر التنفيذ 0x0102</small>
               </div>
             </button>
           </div>
         </div>
 
-        <!-- اللوحة اليسرى: محرر الذاكرة المباشر وسجل الحزم الحقيقي -->
+        <!-- اللوحة اليسرى: محرر الذاكرة المباشر وسجل الحزم -->
         <div class="panel">
           <div class="panel-header">
-            <h2>🧬 القسم 2: قراءة وكتابة الذاكرة الحقيقية (32-Byte AWUC Memory Inspector)</h2>
+            <h2>🧬 القسم 2: قراءة وكتابة الذاكرة (32-Byte AWUC Memory Inspector)</h2>
             <span class="badge">SRAM & DRAM</span>
           </div>
 
@@ -222,27 +226,27 @@
 
           <div class="cli-preview-box" style="margin-top:0.85rem;">
             <div class="cli-header">
-              <span>📡 سجل حزم WebUSB الحقيقي (AWUC 32B -> DATA -> AWUS 13B)</span>
+              <span>📡 سجل الحزم والعمليات (Live AWUC 32B / Offline Rom Lab Log)</span>
               <div>
                 <button class="copy-btn" onclick="clearOtgLog()">مسح</button>
                 <button class="copy-btn" onclick="copyText('otg-live-log')">نسخ السجل</button>
               </div>
             </div>
-            <pre id="otg-live-log" class="uart-terminal" style="height:265px;">[SYSTEM READY] افصل كابل الـ USB من البوردة وأعد توصيله في وضع FEL لتصفير حالة البورت، ثم اضغط "1. إقران الجهاز وتفريغ المنفذ"...</pre>
+            <pre id="otg-live-log" class="uart-terminal" style="height:265px;">[v6.0 READY] يمكنك الآن العمل وتجربة استخراج وتفليش ملف الـ 1.4GB حتى والجهاز مفصول عن هاتفك! وعند توصيل OTG سيتم الإرسال الفعلي للهاردوير.</pre>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ==================== TAB 2: IMAGEWTY UNPACKER & SD BOOT BUILDER ==================== -->
+    <!-- ==================== TAB 2: IMAGEWTY UNPACKER & U-BOOT-SUNXI-WITH-SPL BUILDER ==================== -->
     <section id="tab-imgtool" class="tab-content">
       <div class="panel">
         <div class="panel-header">
-          <h2>📦 مفكك حاوية `IMAGEWTY` (1.4GB) ومولد ملف إحياء الكارت (`SD Unbrick Image Builder`)</h2>
-          <span class="badge">البديل المضمون 100%</span>
+          <h2>📦 مفكك حاوية `IMAGEWTY` ومولد `u-boot-sunxi-with-spl.bin` المباشر بدون ترجمة</h2>
+          <span class="badge">يستخرج البوت الأصلي من الروم</span>
         </div>
         <p class="panel-desc">
-          يفكك ملف `Android-H3-R69-EMCP-V2.0-root.img` ويعرض لك جميع الملفات الداخلية (`fes1`, `boot0`, `u-boot`, `boot.img`)، كما يتيح لك بضغطة زر توليد ملف **`R69_SD_Boot_Unbrick.img`** الجاهز للحرق على كارت ميموري (تضع الكارت في الرسيفر فينسخ البوت السليم إلى ذاكرة الـ eMCP وتنطفئ اللمبة الزرقاء فوراً حتى بدون كابل USB!).
+          بدلاً من المعاناة مع أخطاء بناء U-Boot من الصفر، يقوم هذا المحرك بمسح ملف الروم الرسمي لديك (`Android-H3-R69-EMCP-V2.0-root.img` — 1.4GB) واستخراج **`Boot0/SPL (eGON.BT0)`** و **`U-Boot (eGON.BT1)`** المبرمجين مسبقاً لبوردة `R69-EMCP v2.0 (LPDDR3 336MHz)` ودمجهما لك في ملف **`u-boot-sunxi-with-spl.bin`** جاهز فوراً!
         </p>
 
         <div class="form-row">
@@ -250,26 +254,59 @@
             <label>اختر ملف الروم (`Android-H3-R69-EMCP-V2.0-root.img`):</label>
             <input type="file" id="full-rom-input" onchange="parseImagewtyTable(this)" />
           </div>
-          <div class="form-group" style="display:flex; align-items:flex-end; gap:0.5rem;">
-            <button class="btn-primary" onclick="extractBoot0FromSelectedRom()">
-              ✂️ استخراج ملف Boot0/FES1 (32KB) للـ USB
+          <div class="form-group" style="display:flex; align-items:flex-end; gap:0.5rem; flex-wrap:wrap;">
+            <button class="btn-primary" onclick="buildUbootSunxiWithSplFromRom()">
+              ⚙️ إنتاج وتحميل u-boot-sunxi-with-spl.bin
             </button>
             <button class="btn-warning" onclick="buildSdCardUnbrickImage()">
-              💾 توليد ملف إحياء كارت الميموري (SD Unbrick .img)
+              💾 توليد صورة إقلاع الكارت (SD Unbrick .img)
+            </button>
+            <button class="btn-secondary" onclick="extractBoot0FromSelectedRom()">
+              ✂️ استخراج Boot0/FES1 (32KB) فقط
             </button>
           </div>
         </div>
 
-        <pre id="rom-analysis-output" class="uart-terminal" style="height:340px; max-height:none;">اختر ملف الروم بالأعلى لتفكيك جدول ملفات IMAGEWTY الداخلي...</pre>
+        <!-- قائمة الملفات الداخلية القابلة للتحميل المنفرد -->
+        <div id="extracted-files-grid" class="otg-ops-grid" style="margin: 0.8rem 0;"></div>
+
+        <pre id="rom-analysis-output" class="uart-terminal" style="height:320px; max-height:none;">اختر ملف الروم (1.4GB .img) بالأعلى لاستخراج جدول الملفات الداخلي وإنتاج ملف u-boot-sunxi-with-spl.bin فوراً...</pre>
       </div>
     </section>
 
-    <!-- ==================== TAB 3: LIVE PYTHON 3 ==================== -->
+    <!-- ==================== TAB 3: U-BOOT 2019.01 COMPILER FIX STUDIO ==================== -->
+    <section id="tab-ubootfix" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <h2>🛠️ الحل الجذري لفشل بناء `U-Boot 2019.01` (`error: unknown type name 'ulong'` في `tools/atmelimage.o`)</h2>
+          <button class="copy-btn" onclick="copyText('uboot-fix-script')">نسخ أوامر الإصلاح</button>
+        </div>
+        <p class="panel-desc">
+          انسخ هذا السكريبت ونفذه في الطرفية (أو ضعه في GitHub Actions) لإصلاح خطأ `ulong` في `tools/atmelimage.o` وخطأ `yylloc` وإنتاج ملف `u-boot-sunxi-with-spl.bin` لبوردة R69-EMCP v2.0 بتردد 336MHz:
+        </p>
+        <pre id="uboot-fix-script" class="uart-terminal" style="height:340px; max-height:none;"># 1. حل خطأ: error: unknown type name 'ulong' في tools/atmelimage.o
+sed -i '1i #include <sys/types.h>\n#ifndef ulong\ntypedef unsigned long ulong;\n#endif' include/compiler.h
+
+# 2. تهيئة الإعدادات لبوردة Allwinner H3 وضبط تردد رام R69 على 336MHz
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- orangepi_one_defconfig
+sed -i 's/CONFIG_DRAM_CLK=.*/CONFIG_DRAM_CLK=336/' .config
+sed -i 's/CONFIG_DRAM_ZQ=.*/CONFIG_DRAM_ZQ=3750393/' .config
+
+# 3. بناء u-boot-sunxi-with-spl.bin مع تمرير إعدادات المترجم HOSTCFLAGS الصحيحة
+make -j$(nproc) \
+  ARCH=arm \
+  CROSS_COMPILE=arm-linux-gnueabihf- \
+  HOSTCFLAGS="-O2 -D_GNU_SOURCE -Dulong='unsigned long' -include sys/types.h -fcommon -Wno-deprecated-declarations" \
+  HOSTLDFLAGS="-fcommon"</pre>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 4: LIVE PYTHON 3 ==================== -->
     <section id="tab-python" class="tab-content">
       <div class="config-grid">
         <div class="panel">
           <div class="panel-header">
-            <h2>🐍 مختبر بايثون 3 الحي (توليد حزم AWUC 32-Byte وفحص R69)</h2>
+            <h2>🐍 مختبر بايثون 3 الحي (فحص وتوليد هياكل U-Boot و AWUC)</h2>
           </div>
           <textarea id="python-code-editor" class="code-editor" rows="13" spellcheck="false"></textarea>
           <button class="btn-primary" style="margin-top:0.7rem;" onclick="runBrowserPython()">▶ تشغيل كود البايثون الآن</button>
@@ -284,7 +321,7 @@
   </main>
 
   <footer class="footer">
-    <span>© 2026 <strong>CHIBANI LOL AI v5.0</strong> — True 32-Byte AWUC Sunxi-FEL Protocol for R69-EMCP v2.0 Allwinner H3</span>
+    <span>© 2026 <strong>CHIBANI LOL AI v6.0</strong> — Works Online/Offline | True 32-Byte AWUC + Direct u-boot-sunxi-with-spl.bin Extractor</span>
   </footer>
 
   <script src="i18n.js"></script>

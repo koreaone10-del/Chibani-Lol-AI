@@ -11,13 +11,15 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: 1. Install ARM Cross-Compiler & Build Tools
+      - name: 1. Install ARM Cross-Compiler & Host Development Libraries
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             git \
             build-essential \
             gcc-arm-linux-gnueabihf \
+            g++-arm-linux-gnueabihf \
+            libc6-dev \
             bison \
             flex \
             bc \
@@ -26,51 +28,44 @@ jobs:
             python3 \
             python-is-python3
 
-      - name: 2. Clone U-Boot 2019.01 & Patch Host Tools Bugs
+      - name: 2. Clone U-Boot 2019.01 & Patch Host Tools
         run: |
           git clone --depth 1 -b v2019.01 https://github.com/u-boot/u-boot.git u-boot-r69
           cd u-boot-r69
 
-          # أ) إصلاح خطأ: multiple definition of 'yylloc' في GCC 10+
+          # إصلاح خطأ yylloc في المترجمات الحديثة
           sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/' scripts/dtc/dtc-lexer.l* || true
-
-          # ب) إصلاح خطأ: unknown type name 'ulong' في tools/atmelimage.o بدون التسبب في duplicate unsigned
-          sed -i '1i #include <sys/types.h>' tools/atmelimage.c
-          sed -i '1i #include <sys/types.h>' include/image.h
 
       - name: 3. Configure R69-EMCP v2.0 (336MHz RAM & ZQ=0x003939f9)
         run: |
           cd u-boot-r69
           make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- orangepi_one_defconfig
 
-          # تعديل إعدادات الرام لتطابق قراءة Boot0 الأصلية لبوردة R69-EMCP v2.0
+          # ضبط تردد رام R69 على 336MHz وزق الصعق ZQ
           sed -i 's/CONFIG_DRAM_CLK=.*/CONFIG_DRAM_CLK=336/' .config
           sed -i 's/CONFIG_DRAM_ZQ=.*/CONFIG_DRAM_ZQ=3750393/' .config
 
-          # تعطيل أدوات بايثون الاختيارية (pylibfdt) لمنع توقف البناء بسبب swig/python3.10
+          # تعطيل أدوات بايثون لمنع تعارضات SWIG
           sed -i 's/CONFIG_PYLIBFDT=y/# CONFIG_PYLIBFDT is not set/' .config || true
-          echo "CONFIG_SYS_EXTRA_OPTIONS=\"\"" >> .config
 
       - name: 4. Compile u-boot-sunxi-with-spl.bin
         run: |
           cd u-boot-r69
+          # استخدام HOSTCC نظيف مع تحديد مسارات النظام لـ sys/types.h
           make -j$(nproc) \
             ARCH=arm \
             CROSS_COMPILE=arm-linux-gnueabihf- \
             NO_PYTHON=1 \
-            HOSTCC="gcc -O2 -D_GNU_SOURCE -include sys/types.h -fcommon -Wno-deprecated-declarations" \
+            HOSTCC="gcc -O2 -idirafter /usr/include -idirafter /usr/include/x86_64-linux-gnu -fcommon" \
             HOSTLDFLAGS="-fcommon"
 
-          # التأكد من إنتاج الملف وعرض حجمه في السجل
           ls -lh u-boot-sunxi-with-spl.bin
 
       - name: 5. Create Ready-to-Flash 1MB SD Unbrick Image
         run: |
           cd u-boot-r69
-          # إنشاء صورة كارت ميموري جاهزة بحجم 1MB وحقن البوت لودر في الإزاحة القياسية 8KB (bs=1024 seek=8)
           dd if=/dev/zero of=R69_SD_Unbrick_Bootable.img bs=1M count=1
           dd if=u-boot-sunxi-with-spl.bin of=R69_SD_Unbrick_Bootable.img bs=1024 seek=8 conv=notrunc
-          ls -lh R69_SD_Unbrick_Bootable.img
 
       - name: 6. Upload Compiled Bootloader Artifacts
         uses: actions/upload-artifact@v4
@@ -78,6 +73,4 @@ jobs:
           name: R69-EMCP-v2-Bootloader-Package
           path: |
             u-boot-r69/u-boot-sunxi-with-spl.bin
-            u-boot-r69/spl/sunxi-spl.bin
-            u-boot-r69/u-boot.bin
             u-boot-r69/R69_SD_Unbrick_Bootable.img

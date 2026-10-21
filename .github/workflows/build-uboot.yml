@@ -1,17 +1,44 @@
-      - name: 1. Install ARM Cross-Compiler
+name: Build R69-EMCP v2.0 U-Boot (Allwinner H3 336MHz)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-uboot.yml'
+
+jobs:
+  build-uboot:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: 1. Install ARM Cross-Compiler & Python2 Symlink
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            git build-essential \
-            gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
-            libc6-dev bison flex bc device-tree-compiler \
-            libssl-dev python3
+            git \
+            build-essential \
+            gcc-arm-linux-gnueabihf \
+            g++-arm-linux-gnueabihf \
+            libc6-dev \
+            bison \
+            flex \
+            bc \
+            device-tree-compiler \
+            libssl-dev \
+            python3 \
+            python-is-python3
 
-      - name: 2. Clone U-Boot 2019.01 & Fix dtc yylloc
+          sudo ln -sf /usr/bin/python3 /usr/bin/python2
+
+      - name: 2. Clone U-Boot 2019.01 & Fix Binman Print Syntax
         run: |
           git clone --depth 1 -b v2019.01 https://github.com/u-boot/u-boot.git u-boot-r69
           cd u-boot-r69
-          sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/' scripts/dtc/dtc-lexer.lex.c* || true
+
+          sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/' scripts/dtc/dtc-lexer.l* || true
+
+          sed -i 's/\bprint \([^(]\+\)$/print(\1)/g' tools/binman/binman || true
+          find tools/ -type f -name "*.py" -exec sed -i 's/\bprint \([^()\n]*\)/print(\1)/g' {} + || true
 
       - name: 3. Configure R69-EMCP v2.0 (336MHz RAM & ZQ=0x003939f9)
         run: |
@@ -19,21 +46,41 @@
           make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- orangepi_one_defconfig
           sed -i 's/CONFIG_DRAM_CLK=.*/CONFIG_DRAM_CLK=336/' .config
           sed -i 's/CONFIG_DRAM_ZQ=.*/CONFIG_DRAM_ZQ=3750393/' .config
+          sed -i 's/CONFIG_PYLIBFDT=y/# CONFIG_PYLIBFDT is not set/' .config || true
 
       - name: 4. Compile u-boot-sunxi-with-spl.bin (بدون binman)
         run: |
           cd u-boot-r69
-          # بناء الملفين فقط — تخطي binman نهائياً
+          # بناء الهدفين فقط — تجاوز binman نهائياً
           make -j$(nproc) \
             ARCH=arm \
             CROSS_COMPILE=arm-linux-gnueabihf- \
+            NO_PYTHON=1 \
             HOSTCC="gcc -O2 -idirafter /usr/include -idirafter /usr/include/x86_64-linux-gnu -fcommon" \
             HOSTLDFLAGS="-fcommon" \
-            u-boot.bin spl/sunxi-spl.bin
+            u-boot.bin spl/u-boot-spl
 
-          # تجميع الصورة يدوياً بنفس تخطيط binman الرسمي لـ sunxi:
+          # التحقق من وجود SPL قبل التجميع
+          test -f spl/sunxi-spl.bin
+
+          # تجميع الصورة يدوياً بنفس تخطيط Allwinner:
+          # SPL عند 8KB (القطاع 16) و u-boot.bin عند 32KB
           dd if=/dev/zero of=u-boot-sunxi-with-spl.bin bs=1024 count=1016
           dd if=spl/sunxi-spl.bin of=u-boot-sunxi-with-spl.bin bs=1024 seek=8  conv=notrunc
           dd if=u-boot.bin      of=u-boot-sunxi-with-spl.bin bs=1024 seek=32 conv=notrunc
 
           ls -lh u-boot-sunxi-with-spl.bin
+
+      - name: 5. Create Ready-to-Flash 1MB SD Unbrick Image
+        run: |
+          cd u-boot-r69
+          dd if=/dev/zero of=R69_SD_Unbrick_Bootable.img bs=1M count=1
+          dd if=u-boot-sunxi-with-spl.bin of=R69_SD_Unbrick_Bootable.img bs=1024 seek=8 conv=notrunc
+
+      - name: 6. Upload Compiled Bootloader Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: R69-EMCP-v2-Bootloader-Package
+          path: |
+            u-boot-r69/u-boot-sunxi-with-spl.bin
+            u-boot-r69/R69_SD_Unbrick_Bootable.img

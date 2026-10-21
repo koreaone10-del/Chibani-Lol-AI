@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: 1. Install ARM Cross-Compiler & Python2 Symlink
+      - name: 1. Install Build Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -19,56 +19,132 @@ jobs:
             build-essential \
             gcc-arm-linux-gnueabihf \
             g++-arm-linux-gnueabihf \
-            libc6-dev \
             bison \
             flex \
             bc \
             device-tree-compiler \
             libssl-dev \
             python3 \
+            python3-setuptools \
+            python3-pyelftools \
             python-is-python3
 
-          sudo ln -sf /usr/bin/python3 /usr/bin/python2
-
-      - name: 2. Clone U-Boot 2019.01 & Fix Binman Print Syntax
+      - name: 2. Clone U-Boot 2019.01
         run: |
-          git clone --depth 1 -b v2019.01 https://github.com/u-boot/u-boot.git u-boot-r69
-          cd u-boot-r69
+          git clone --depth 1 -b v2019.01 \
+            https://github.com/u-boot/u-boot.git u-boot-r69
 
-          # إصلاح خطأ yylloc في المترجمات الحديثة
-          sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/' scripts/dtc/dtc-lexer.l* || true
-
-          # إصلاح خطأ print في ملف binman الرئيسي وباقي الأدوات لتتطابق مع Python 3
-          sed -i 's/\bprint \([^(]\+\)$/print(\1)/g' tools/binman/binman || true
-          find tools/ -type f -name "*.py" -exec sed -i 's/\bprint \([^()\n]*\)/print(\1)/g' {} + || true
-
-      - name: 3. Configure R69-EMCP v2.0 (336MHz RAM & ZQ=0x003939f9)
+      - name: 3. Patch Legacy Python Syntax
         run: |
           cd u-boot-r69
-          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- orangepi_one_defconfig
-          sed -i 's/CONFIG_DRAM_CLK=.*/CONFIG_DRAM_CLK=336/' .config
-          sed -i 's/CONFIG_DRAM_ZQ=.*/CONFIG_DRAM_ZQ=3750393/' .config
-          sed -i 's/CONFIG_PYLIBFDT=y/# CONFIG_PYLIBFDT is not set/' .config || true
 
-      - name: 4. Compile u-boot-sunxi-with-spl.bin
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          targets = [
+              Path("tools/binman/binman"),
+          ]
+
+          targets += list(Path("tools/binman").rglob("*.py"))
+
+          for path in targets:
+              if not path.is_file():
+                  continue
+
+              try:
+                  text = path.read_text()
+              except (UnicodeDecodeError, OSError):
+                  continue
+
+              original = text
+
+              # Convert simple Python 2 print statements:
+              # print value -> print(value)
+              lines = []
+              for line in text.splitlines(keepends=True):
+                  match = re.match(
+                      r'^(\s*)print\s+(.+?)(\s*)$',
+                      line.rstrip("\r\n")
+                  )
+
+                  if match:
+                      indent, expression, trailing = match.groups()
+                      if not expression.startswith("("):
+                          ending = line[len(line.rstrip("\r\n")):]
+                          line = (
+                              indent + "print(" + expression + ")"
+                              + trailing + ending
+                          )
+
+                  lines.append(line)
+
+              text = "".join(lines)
+
+              if text != original:
+                  path.write_text(text)
+                  print("Patched:", path)
+
+          # Confirm the main script now parses with Python 3.
+          import ast
+          ast.parse(Path("tools/binman/binman").read_text())
+          print("binman Python 3 syntax check passed")
+          PY
+
+          # Fix the known device-tree lexer declaration if present.
+          if [ -f scripts/dtc/dtc-lexer.l ]; then
+            sed -i \
+              's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/' \
+              scripts/dtc/dtc-lexer.l
+          fi
+
+      - name: 4. Configure Orange Pi One for Allwinner H3
         run: |
           cd u-boot-r69
-          make -j$(nproc) \
+
+          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- \
+            orangepi_one_defconfig
+
+          grep -q '^CONFIG_DRAM_CLK=' .config \
+            && sed -i 's/^CONFIG_DRAM_CLK=.*/CONFIG_DRAM_CLK=336/' .config \
+            || echo 'CONFIG_DRAM_CLK=336' >> .config
+
+          grep -q '^CONFIG_DRAM_ZQ=' .config \
+            && sed -i 's/^CONFIG_DRAM_ZQ=.*/CONFIG_DRAM_ZQ=3750393/' .config \
+            || echo 'CONFIG_DRAM_ZQ=3750393' >> .config
+
+          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- olddefconfig
+
+      - name: 5. Compile U-Boot
+        run: |
+          cd u-boot-r69
+
+          make -j"$(nproc)" \
             ARCH=arm \
             CROSS_COMPILE=arm-linux-gnueabihf- \
-            NO_PYTHON=1 \
-            HOSTCC="gcc -O2 -idirafter /usr/include -idirafter /usr/include/x86_64-linux-gnu -fcommon" \
+            HOSTCC="gcc -O2 -fcommon" \
             HOSTLDFLAGS="-fcommon"
 
+          test -s u-boot-sunxi-with-spl.bin
           ls -lh u-boot-sunxi-with-spl.bin
 
-      - name: 5. Create Ready-to-Flash 1MB SD Unbrick Image
+      - name: 6. Create SD Bootloader Image
         run: |
           cd u-boot-r69
-          dd if=/dev/zero of=R69_SD_Unbrick_Bootable.img bs=1M count=1
-          dd if=u-boot-sunxi-with-spl.bin of=R69_SD_Unbrick_Bootable.img bs=1024 seek=8 conv=notrunc
 
-      - name: 6. Upload Compiled Bootloader Artifacts
+          test -s u-boot-sunxi-with-spl.bin
+
+          dd if=/dev/zero \
+            of=R69_SD_Unbrick_Bootable.img \
+            bs=1M count=1
+
+          dd if=u-boot-sunxi-with-spl.bin \
+            of=R69_SD_Unbrick_Bootable.img \
+            bs=1024 seek=8 conv=notrunc
+
+          ls -lh R69_SD_Unbrick_Bootable.img
+
+      - name: 7. Upload Bootloader Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: R69-EMCP-v2-Bootloader-Package

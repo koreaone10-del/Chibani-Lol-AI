@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: 1. Install ARM Cross-Compiler & Python2 Compatibility
+      - name: 1. Install ARM Cross-Compiler & Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -25,17 +25,21 @@ jobs:
             bc \
             device-tree-compiler \
             libssl-dev \
-            python3 \
-            python-is-python3
+            python3
 
-          # حل مشكلة python2 عبر ربطه بـ python3
-          sudo ln -sf /usr/bin/python3 /usr/bin/python2
-
-      - name: 2. Clone U-Boot 2019.01 & Patch Host Tools
+      - name: 2. Clone U-Boot 2019.01 & Fix Python3 Print Syntax
         run: |
           git clone --depth 1 -b v2019.01 https://github.com/u-boot/u-boot.git u-boot-r69
           cd u-boot-r69
+
+          # إصلاح خطأ yylloc في المترجمات الحديثة
           sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/' scripts/dtc/dtc-lexer.l* || true
+
+          # تحويل جميع سكربتات بايثون الداخلية (tools/bintool و sunxi-tools) لتتطابق مع Python 3 (إضافة أقواس للـ print)
+          find tools/ -type f -name "*.py" -exec sed -i 's/print \("[^"]*"\)/print(\1)/g' {} + || true
+          find tools/ -type f -name "*.py" -exec sed -i "s/print \('[^']*'\)/print(\1)/g" {} + || true
+          # إصلاح أي ملفات داخل tools/binnan أو tools/binman
+          find . -type f -name "*.py" -exec sed -i 's/\bprint \([^()\n]*\)/print(\1)/g' {} + || true
 
       - name: 3. Configure R69-EMCP v2.0 (336MHz RAM & ZQ=0x003939f9)
         run: |

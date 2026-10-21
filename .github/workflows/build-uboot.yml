@@ -1,0 +1,36 @@
+name: Build R69 H3 LPDDR3 U-Boot 2019.01
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-uboot:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Install ARM Cross-Compiler & Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git build-essential gcc-arm-linux-gnueabihf bison flex swig python3-dev libssl-dev device-tree-compiler bc
+
+      - name: Clone U-Boot 2019.01 (LPDDR3 H3 Branch)
+        run: |
+          git clone --depth 1 -b v2019.01 https://github.com/u-boot/u-boot.git u-boot-r69
+          cd u-boot-r69
+          # إصلاح جذري لخطأ unknown type name 'ulong' في tools/atmelimage.o
+          sed -i '1i #include <sys/types.h>\n#ifndef ulong\ntypedef unsigned long ulong;\n#endif' include/compiler.h
+
+      - name: Configure & Compile u-boot-sunxi-with-spl.bin for R69 (336MHz)
+        run: |
+          cd u-boot-r69
+          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- orangepi_one_defconfig
+          sed -i 's/CONFIG_DRAM_CLK=.*/CONFIG_DRAM_CLK=336/' .config
+          sed -i 's/CONFIG_DRAM_ZQ=.*/CONFIG_DRAM_ZQ=3750393/' .config
+          make -j$(nproc) ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- \
+            HOSTCFLAGS="-O2 -D_GNU_SOURCE -Dulong='unsigned long' -include sys/types.h -fcommon -Wno-deprecated-declarations" \
+            HOSTLDFLAGS="-fcommon"
+
+      - name: Upload Ready u-boot-sunxi-with-spl.bin
+        uses: actions/upload-artifact@v4
+        with:
+          name: u-boot-sunxi-with-spl-r69-336mhz
+          path: u-boot-r69/u-boot-sunxi-with-spl.bin

@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: 1. Install ARM Cross-Compiler & Host Development Libraries
+      - name: 1. Install ARM Cross-Compiler & Python2 Compatibility
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -28,30 +28,26 @@ jobs:
             python3 \
             python-is-python3
 
+          # حل مشكلة python2 عبر ربطه بـ python3
+          sudo ln -sf /usr/bin/python3 /usr/bin/python2
+
       - name: 2. Clone U-Boot 2019.01 & Patch Host Tools
         run: |
           git clone --depth 1 -b v2019.01 https://github.com/u-boot/u-boot.git u-boot-r69
           cd u-boot-r69
-
-          # إصلاح خطأ yylloc في المترجمات الحديثة
           sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/' scripts/dtc/dtc-lexer.l* || true
 
       - name: 3. Configure R69-EMCP v2.0 (336MHz RAM & ZQ=0x003939f9)
         run: |
           cd u-boot-r69
           make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- orangepi_one_defconfig
-
-          # ضبط تردد رام R69 على 336MHz وزق الصعق ZQ
           sed -i 's/CONFIG_DRAM_CLK=.*/CONFIG_DRAM_CLK=336/' .config
           sed -i 's/CONFIG_DRAM_ZQ=.*/CONFIG_DRAM_ZQ=3750393/' .config
-
-          # تعطيل أدوات بايثون لمنع تعارضات SWIG
           sed -i 's/CONFIG_PYLIBFDT=y/# CONFIG_PYLIBFDT is not set/' .config || true
 
       - name: 4. Compile u-boot-sunxi-with-spl.bin
         run: |
           cd u-boot-r69
-          # استخدام HOSTCC نظيف مع تحديد مسارات النظام لـ sys/types.h
           make -j$(nproc) \
             ARCH=arm \
             CROSS_COMPILE=arm-linux-gnueabihf- \

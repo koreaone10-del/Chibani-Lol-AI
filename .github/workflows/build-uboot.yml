@@ -1,153 +1,207 @@
-name: Build R69-EMCP v2.0 U-Boot (Allwinner H3 336MHz)
+name: Build R69-EMCP v2.0 U-Boot
 
 on:
   workflow_dispatch:
+
   push:
     paths:
-      - '.github/workflows/build-uboot.yml'
+      - ".github/workflows/build-uboot.yml"
 
 jobs:
   build-uboot:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: 1. Install Build Dependencies
+      - name: 1. Install Dependencies
+        shell: bash
         run: |
+          set -euxo pipefail
+
           sudo apt-get update
+
           sudo apt-get install -y \
             git \
             build-essential \
             gcc-arm-linux-gnueabihf \
             g++-arm-linux-gnueabihf \
+            libc6-dev \
             bison \
             flex \
             bc \
             device-tree-compiler \
             libssl-dev \
             python3 \
+            python3-dev \
             python3-setuptools \
-            python3-pyelftools \
-            python-is-python3
+            python3-pip \
+            python3-distutils \
+            python-is-python3 \
+            2to3
+
+          python3 --version
+          gcc --version
+          arm-linux-gnueabihf-gcc --version
 
       - name: 2. Clone U-Boot 2019.01
+        shell: bash
         run: |
-          git clone --depth 1 -b v2019.01 \
-            https://github.com/u-boot/u-boot.git u-boot-r69
+          set -euxo pipefail
 
-      - name: 3. Patch Legacy Python Syntax
-        run: |
+          git clone \
+            --depth 1 \
+            --branch v2019.01 \
+            https://github.com/u-boot/u-boot.git \
+            u-boot-r69
+
           cd u-boot-r69
 
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
 
-          targets = [
-              Path("tools/binman/binman"),
-          ]
+      - name: 3. Convert U-Boot Python 2 Tools to Python 3
+        shell: bash
+        run: |
+          set -euxo pipefail
 
-          targets += list(Path("tools/binman").rglob("*.py"))
+          cd u-boot-r69
 
-          for path in targets:
-              if not path.is_file():
-                  continue
-
-              try:
-                  text = path.read_text()
-              except (UnicodeDecodeError, OSError):
-                  continue
-
-              original = text
-
-              # Convert simple Python 2 print statements:
-              # print value -> print(value)
-              lines = []
-              for line in text.splitlines(keepends=True):
-                  match = re.match(
-                      r'^(\s*)print\s+(.+?)(\s*)$',
-                      line.rstrip("\r\n")
-                  )
-
-                  if match:
-                      indent, expression, trailing = match.groups()
-                      if not expression.startswith("("):
-                          ending = line[len(line.rstrip("\r\n")):]
-                          line = (
-                              indent + "print(" + expression + ")"
-                              + trailing + ending
-                          )
-
-                  lines.append(line)
-
-              text = "".join(lines)
-
-              if text != original:
-                  path.write_text(text)
-                  print("Patched:", path)
-
-          # Confirm the main script now parses with Python 3.
-          import ast
-          ast.parse(Path("tools/binman/binman").read_text())
-          print("binman Python 3 syntax check passed")
-          PY
-
-          # Fix the known device-tree lexer declaration if present.
-          if [ -f scripts/dtc/dtc-lexer.l ]; then
+          # إصلاح yylloc في DTC
+          if grep -Rqs '^YYLTYPE yylloc;' scripts/dtc; then
             sed -i \
               's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/' \
               scripts/dtc/dtc-lexer.l
           fi
 
-      - name: 4. Configure Orange Pi One for Allwinner H3
+          # U-Boot 2019.01 يستخدم Python 2.
+          # تحويل أدوات binman و patman و dtoc إلى Python 3.
+          2to3 -w -n \
+            tools/binman \
+            tools/patman \
+            tools/dtoc
+
+          # إصلاح مباشر احتياطي لصيغة print القديمة
+          if [ -f tools/binman/binman.py ]; then
+            sed -i \
+              -E 's/^([[:space:]]*)print[[:space:]]+(.+)$/\1print(\2)/' \
+              tools/binman/binman.py
+          fi
+
+          # اختبار ملفات Python
+          python3 -m py_compile \
+            tools/binman/binman.py
+
+          echo "Python conversion completed successfully"
+
+      - name: 4. Configure Orange Pi One H3
+        shell: bash
         run: |
+          set -euxo pipefail
+
           cd u-boot-r69
 
-          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- \
+          make \
+            ARCH=arm \
+            CROSS_COMPILE=arm-linux-gnueabihf- \
             orangepi_one_defconfig
 
-          grep -q '^CONFIG_DRAM_CLK=' .config \
-            && sed -i 's/^CONFIG_DRAM_CLK=.*/CONFIG_DRAM_CLK=336/' .config \
-            || echo 'CONFIG_DRAM_CLK=336' >> .config
+          # ضبط تردد DRAM على 336 MHz
+          sed -i '/^CONFIG_DRAM_CLK=/d' .config
+          echo 'CONFIG_DRAM_CLK=336' >> .config
 
-          grep -q '^CONFIG_DRAM_ZQ=' .config \
-            && sed -i 's/^CONFIG_DRAM_ZQ=.*/CONFIG_DRAM_ZQ=3750393/' .config \
-            || echo 'CONFIG_DRAM_ZQ=3750393' >> .config
+          # ZQ = 0x003939f9 = 3750393 بالنظام العشري
+          sed -i '/^CONFIG_DRAM_ZQ=/d' .config
+          echo 'CONFIG_DRAM_ZQ=3750393' >> .config
 
-          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- olddefconfig
+          # تعطيل PYLIBFDT
+          sed -i '/^CONFIG_PYLIBFDT=/d' .config
+          echo '# CONFIG_PYLIBFDT is not set' >> .config
+
+          # تعطيل بعض الأدوات التي قد تتطلب Python إضافيًا
+          sed -i '/^CONFIG_TOOLS_LIBFDT=/d' .config
+          echo '# CONFIG_TOOLS_LIBFDT is not set' >> .config
+
+          # تحديث ملف الإعدادات
+          make \
+            ARCH=arm \
+            CROSS_COMPILE=arm-linux-gnueabihf- \
+            olddefconfig
+
+          echo "Current DRAM configuration:"
+          grep -E \
+            'CONFIG_DRAM_(CLK|ZQ)|CONFIG_PYLIBFDT|CONFIG_TOOLS_LIBFDT' \
+            .config || true
 
       - name: 5. Compile U-Boot
+        shell: bash
         run: |
+          set -euxo pipefail
+
           cd u-boot-r69
 
           make -j"$(nproc)" \
             ARCH=arm \
             CROSS_COMPILE=arm-linux-gnueabihf- \
-            HOSTCC="gcc -O2 -fcommon" \
+            HOSTCC="gcc -O2 -fcommon -idirafter /usr/include -idirafter /usr/include/x86_64-linux-gnu" \
+            HOSTCFLAGS="-O2 -fcommon" \
             HOSTLDFLAGS="-fcommon"
 
-          test -s u-boot-sunxi-with-spl.bin
+          if [ ! -s u-boot-sunxi-with-spl.bin ]; then
+            echo "ERROR: u-boot-sunxi-with-spl.bin was not created"
+            exit 1
+          fi
+
+          echo "U-Boot compiled successfully:"
           ls -lh u-boot-sunxi-with-spl.bin
 
-      - name: 6. Create SD Bootloader Image
+      - name: 6. Create 1MB SD Unbrick Image
+        shell: bash
         run: |
+          set -euxo pipefail
+
+          cd u-boot-r69
+
+          # إنشاء صورة SD بحجم 1MB
+          dd \
+            if=/dev/zero \
+            of=R69_SD_Unbrick_Bootable.img \
+            bs=1M \
+            count=1 \
+            status=progress
+
+          # Allwinner H3 يبدأ SPL عند offset 8KB
+          dd \
+            if=u-boot-sunxi-with-spl.bin \
+            of=R69_SD_Unbrick_Bootable.img \
+            bs=1024 \
+            seek=8 \
+            conv=notrunc \
+            status=progress
+
+          sync
+
+          echo "Generated files:"
+          ls -lh \
+            u-boot-sunxi-with-spl.bin \
+            R69_SD_Unbrick_Bootable.img
+
+      - name: 7. Verify Bootloader Image
+        shell: bash
+        run: |
+          set -euxo pipefail
+
           cd u-boot-r69
 
           test -s u-boot-sunxi-with-spl.bin
+          test -s R69_SD_Unbrick_Bootable.img
 
-          dd if=/dev/zero \
-            of=R69_SD_Unbrick_Bootable.img \
-            bs=1M count=1
+          echo "Bootloader verification completed successfully"
 
-          dd if=u-boot-sunxi-with-spl.bin \
-            of=R69_SD_Unbrick_Bootable.img \
-            bs=1024 seek=8 conv=notrunc
-
-          ls -lh R69_SD_Unbrick_Bootable.img
-
-      - name: 7. Upload Bootloader Artifacts
+      - name: 8. Upload Bootloader Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: R69-EMCP-v2-Bootloader-Package
+          if-no-files-found: error
           path: |
             u-boot-r69/u-boot-sunxi-with-spl.bin
             u-boot-r69/R69_SD_Unbrick_Bootable.img
+            u-boot-r69/.config

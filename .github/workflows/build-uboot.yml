@@ -28,10 +28,9 @@ jobs:
             python3 \
             python-is-python3
 
-          # حل جذرى نهائي لمشكلة بحث أدوات U-Boot عن python2
           sudo ln -sf /usr/bin/python3 /usr/bin/python2
 
-      - name: 2. Clone U-Boot 2019.01 & Fix Host Tools
+      - name: 2. Clone U-Boot 2019.01 & Fix Binman Python3 Sets Error
         run: |
           git clone --depth 1 -b v2019.01 https://github.com/u-boot/u-boot.git u-boot-r69
           cd u-boot-r69
@@ -39,8 +38,11 @@ jobs:
           # إصلاح خطأ yylloc في المترجمات الحديثة
           sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/' scripts/dtc/dtc-lexer.l* || true
 
-          # تحويل أي سكربتات بايثون قديمة لاستخدام أقواس print إن وجدت
-          find tools/ -type f -name "*.py" -exec sed -i 's/\bprint \([^()\n]*\)/print(\1)/g' {} + || true
+          # إصلاح مشكلة ModuleNotFoundError: No module named 'sets' في أدوات binman
+          find tools/binman/ -type f -name "*.py" -exec sed -i 's/from sets import Set/# from sets import Set/g' {} + || true
+          find tools/binman/ -type f -name "*.py" -exec sed -i 's/import sets/# import sets/g' {} + || true
+          # استبدال Set بـ set العادية إن وجدت في binman
+          find tools/binman/ -type f -name "*.py" -exec sed -i 's/\bSet\b/set/g' {} + || true
 
       - name: 3. Configure R69-EMCP v2.0 (336MHz RAM & ZQ=0x003939f9)
         run: |

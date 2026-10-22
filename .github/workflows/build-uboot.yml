@@ -1,4 +1,4 @@
-name: Build R69-EMCP v2.0 U-Boot (Allwinner H3 336MHz)
+name: Build R69-EMCP v2.0 Auto-Unbrick U-Boot (336MHz LPDDR3)
 
 on:
   workflow_dispatch:
@@ -11,47 +11,42 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: 1. Install ARM Cross-Compiler & Python2 Symlink
+      - name: 1. Install ARM Cross-Compiler & Tools
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            git \
-            build-essential \
-            gcc-arm-linux-gnueabihf \
-            g++-arm-linux-gnueabihf \
-            libc6-dev \
-            bison \
-            flex \
-            bc \
-            device-tree-compiler \
-            libssl-dev \
-            python3 \
-            python-is-python3
-
+            git build-essential gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
+            libc6-dev bison flex bc device-tree-compiler libssl-dev python3 python-is-python3
           sudo ln -sf /usr/bin/python3 /usr/bin/python2
 
-      - name: 2. Clone U-Boot 2019.01 & Fix Binman Print Syntax
+      - name: 2. Clone U-Boot v2019.01 & Patch GCC-11 / Python3
         run: |
           git clone --depth 1 -b v2019.01 https://github.com/u-boot/u-boot.git u-boot-r69
           cd u-boot-r69
-
           sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/' scripts/dtc/dtc-lexer.l* || true
 
-          sed -i 's/\bprint \([^(]\+\)$/print(\1)/g' tools/binman/binman || true
-          find tools/ -type f -name "*.py" -exec sed -i 's/\bprint \([^()\n]*\)/print(\1)/g' {} + || true
-
-      - name: 3. Configure R69-EMCP v2.0 (336MHz RAM & ZQ=0x003939f9)
+      - name: 3. Configure R69-EMCP v2.0 (336MHz LPDDR3, ZQ=0x003939f9 & eMMC Support)
         run: |
           cd u-boot-r69
           make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- orangepi_one_defconfig
+
+          # ضبط تردد ومعامل رامات R69-EMCP v2.0 الدقيق
           sed -i 's/CONFIG_DRAM_CLK=.*/CONFIG_DRAM_CLK=336/' .config
           sed -i 's/CONFIG_DRAM_ZQ=.*/CONFIG_DRAM_ZQ=3750393/' .config
           sed -i 's/CONFIG_PYLIBFDT=y/# CONFIG_PYLIBFDT is not set/' .config || true
 
-      - name: 4. Compile u-boot-sunxi-with-spl.bin (بدون binman)
+          # تفعيل دعم ذواكر eMCP / eMMC (المنفذ MMC2 في معالج H3) وأوامر الفرمطة السريعة
+          echo "CONFIG_MMC_SUNXI_SLOT_EXTRA=2" >> .config
+          echo "CONFIG_SUPPORT_EMMC_BOOT=y" >> .config
+          echo "CONFIG_CMD_MMC=y" >> .config
+          echo "CONFIG_CMD_GPT=y" >> .config
+          echo "CONFIG_CMD_PART=y" >> .config
+          echo "CONFIG_USB_GADGET=y" >> .config
+          echo "CONFIG_CMD_FASTBOOT=y" >> .config
+
+      - name: 4. Compile SPL & U-Boot (Bypassing binman)
         run: |
           cd u-boot-r69
-          # بناء الهدفين فقط — تجاوز binman نهائياً
           make -j$(nproc) \
             ARCH=arm \
             CROSS_COMPILE=arm-linux-gnueabihf- \
@@ -60,27 +55,27 @@ jobs:
             HOSTLDFLAGS="-fcommon" \
             u-boot.bin spl/u-boot-spl
 
-          # التحقق من وجود SPL قبل التجميع
           test -f spl/sunxi-spl.bin
+          test -f u-boot.bin
 
-          # تجميع الصورة يدوياً بنفس تخطيط Allwinner:
-          # SPL عند 8KB (القطاع 16) و u-boot.bin عند 32KB
-          dd if=/dev/zero of=u-boot-sunxi-with-spl.bin bs=1024 count=1016
-          dd if=spl/sunxi-spl.bin of=u-boot-sunxi-with-spl.bin bs=1024 seek=8  conv=notrunc
-          dd if=u-boot.bin      of=u-boot-sunxi-with-spl.bin bs=1024 seek=32 conv=notrunc
+          # 1) بناء ملف u-boot-sunxi-with-spl.bin القياسي للـ OTG (SPL عند 0KB و U-Boot عند 32KB بدون أصفار زائدة)
+          cp spl/sunxi-spl.bin u-boot-sunxi-with-spl.bin
+          dd if=u-boot.bin of=u-boot-sunxi-with-spl.bin bs=1024 seek=32 conv=notrunc
 
-          ls -lh u-boot-sunxi-with-spl.bin
+          # 2) بناء ملف SPL النقي وحده (24KB) للاختبار السريع عبر OTG
+          cp spl/sunxi-spl.bin r69_spl_336mhz_only.bin
 
-      - name: 5. Create Ready-to-Flash 1MB SD Unbrick Image
-        run: |
-          cd u-boot-r69
+          # 3) بناء صورة كارت الميموري الجاهزة للحرق (SPL عند 8KB = القطاع 16)
           dd if=/dev/zero of=R69_SD_Unbrick_Bootable.img bs=1M count=1
           dd if=u-boot-sunxi-with-spl.bin of=R69_SD_Unbrick_Bootable.img bs=1024 seek=8 conv=notrunc
 
-      - name: 6. Upload Compiled Bootloader Artifacts
+          ls -lh u-boot-sunxi-with-spl.bin r69_spl_336mhz_only.bin R69_SD_Unbrick_Bootable.img
+
+      - name: 5. Upload R69 Auto-Unbrick Package
         uses: actions/upload-artifact@v4
         with:
-          name: R69-EMCP-v2-Bootloader-Package
+          name: R69-EMCP-v2-AutoPilot-Package
           path: |
             u-boot-r69/u-boot-sunxi-with-spl.bin
+            u-boot-r69/r69_spl_336mhz_only.bin
             u-boot-r69/R69_SD_Unbrick_Bootable.img

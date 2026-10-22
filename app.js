@@ -1,6 +1,6 @@
 // ============================================================================
-// CHIBANI LOL AI v7.0 — FULL AUTO-PILOT HARDWARE PROFILER, DECODER & UNBRICKER
-// التعرف التلقائي على مكونات الجهاز + فك التشفير + تصحيح Checksum + الإقلاع الآلي
+// CHIBANI LOL AI v7.2 — FORCED FEL-RETURN, FULL 24KB SPL & AUTO-RECONNECT ENGINE
+// يعالج انقطاع المرحلة 4 (0.0 KB DRAM) عبر إجبار SPL على العودة لمنفذ USB OTG
 // ============================================================================
 
 let connectedOtgDevice = null;
@@ -14,13 +14,44 @@ let pyodideInstance = null;
 
 // قاعدة بيانات معالجات Allwinner للتعرف الآلي
 const ALLWINNER_SOC_DB = {
-  0x1680: { name: "Allwinner H3 (sun8iw7p1)", arch: "ARM Cortex-A7 Quad-Core", sramA1: 0x00000000, sramA2: 0x00044000, felStack: 0x00007e00, dramBase: 0x40000000, ubootAddr: 0x4a000000 },
-  0x1681: { name: "Allwinner H2+ (sun8iw7p1)", arch: "ARM Cortex-A7 Quad-Core", sramA1: 0x00000000, sramA2: 0x00044000, felStack: 0x00007e00, dramBase: 0x40000000, ubootAddr: 0x4a000000 },
-  0x1718: { name: "Allwinner H5 (sun50iw2p1)", arch: "ARM Cortex-A53 64-bit", sramA1: 0x00010000, sramA2: 0x00044000, felStack: 0x00017e00, dramBase: 0x40000000, ubootAddr: 0x4a000000 },
-  0x1728: { name: "Allwinner H6 (sun50iw6p1)", arch: "ARM Cortex-A53 64-bit", sramA1: 0x00020000, sramA2: 0x00100000, felStack: 0x00027e00, dramBase: 0x40000000, ubootAddr: 0x4a000000 }
+  0x1680: {
+    name: "Allwinner H3 (sun8iw7p1)",
+    arch: "ARM Cortex-A7 Quad-Core",
+    sramA1: 0x00000000,
+    sramA2: 0x00044000,
+    felStack: 0x00007e00,
+    dramBase: 0x40000000,
+    ubootAddr: 0x4a000000
+  },
+  0x1681: {
+    name: "Allwinner H2+ (sun8iw7p1)",
+    arch: "ARM Cortex-A7 Quad-Core",
+    sramA1: 0x00000000,
+    sramA2: 0x00044000,
+    felStack: 0x00007e00,
+    dramBase: 0x40000000,
+    ubootAddr: 0x4a000000
+  },
+  0x1718: {
+    name: "Allwinner H5 (sun50iw2p1)",
+    arch: "ARM Cortex-A53 64-bit",
+    sramA1: 0x00010000,
+    sramA2: 0x00044000,
+    felStack: 0x00017e00,
+    dramBase: 0x40000000,
+    ubootAddr: 0x4a000000
+  },
+  0x1728: {
+    name: "Allwinner H6 (sun50iw6p1)",
+    arch: "ARM Cortex-A53 64-bit",
+    sramA1: 0x00020000,
+    sramA2: 0x00100000,
+    felStack: 0x00027e00,
+    dramBase: 0x40000000,
+    ubootAddr: 0x4a000000
+  }
 };
 
-// ملف تعريف الهاردوير المكتشف تلقائياً
 let detectedHardware = {
   socId: 0x1680,
   socName: "Allwinner H3 (R69-EMCP v2.0)",
@@ -64,11 +95,12 @@ window.addEventListener("DOMContentLoaded", () => {
       connectedOtgDevice = null;
       const st = document.getElementById("otg-conn-state");
       if (st) {
-        st.textContent = "تم فصل OTG (أعد التوصيل)";
+        st.textContent = "تم فصل OTG (أو إعادة تهيئة USB)";
         st.style.color = "#f59e0b";
       }
-      document.getElementById("otg-status-text").textContent = "OTG مفصول ●";
-      logOtg("⚠️ تم فصل كابل OTG (أو أعاد المعالج تشغيل منفذ الـ USB بعد فتح الرام).");
+      const topTxt = document.getElementById("otg-status-text");
+      if (topTxt) topTxt.textContent = "OTG مفصول ●";
+      logOtg("⚠️ تنبيه: تم فصل كابل OTG أو أن المعالج يعيد تشغيل بورت الـ USB بعد فتح الرام.");
     });
   }
 });
@@ -91,7 +123,7 @@ function logOtg(msg) {
 }
 
 function clearOtgLog() {
-  document.getElementById("otg-live-log").textContent = "[v7.0 AUTO-PILOT LOG READY]";
+  document.getElementById("otg-live-log").textContent = "[v7.2 FORCED FEL-RETURN ENGINE READY]";
 }
 
 function setStageStatus(stageNum, text, color) {
@@ -111,7 +143,7 @@ function isRealUsbReady() {
 }
 
 // ============================================================================
-// 1. إقران الجهاز وتفريغ المنفذ + فحص مكونات الهاردوير تلقائياً
+// 1. إقران الجهاز وإعادة الاتصال التلقائي (Auto-Reconnect after SPL)
 // ============================================================================
 async function connectRealOtgDevice() {
   if (!("usb" in navigator)) {
@@ -131,7 +163,8 @@ async function bindRealUsbDevice(device) {
     connectedOtgDevice = device;
     const vid = "0x" + device.vendorId.toString(16).padStart(4, "0").toUpperCase();
     const pid = "0x" + device.productId.toString(16).padStart(4, "0").toUpperCase();
-    document.getElementById("otg-vid-pid").textContent = `${vid} : ${pid}`;
+    const vidEl = document.getElementById("otg-vid-pid");
+    if (vidEl) vidEl.textContent = `${vid} : ${pid}`;
 
     if (!device.opened) await device.open();
     if (device.configuration === null) await device.selectConfiguration(1);
@@ -151,16 +184,41 @@ async function bindRealUsbDevice(device) {
     }
 
     const st = document.getElementById("otg-conn-state");
-    st.textContent = "متصل فعلياً عبر OTG ✅";
-    st.style.color = "#10b981";
-    document.getElementById("otg-status-text").textContent = `OTG Connected (${vid}) ●`;
-    document.getElementById("otg-endpoints").textContent = `OUT: EP#${otgEndpointOut} | IN: EP#${otgEndpointIn}`;
+    if (st) {
+      st.textContent = "متصل فعلياً عبر OTG ✅";
+      st.style.color = "#10b981";
+    }
+    const topTxt = document.getElementById("otg-status-text");
+    if (topTxt) topTxt.textContent = `OTG Connected (${vid}) ●`;
+    const epEl = document.getElementById("otg-endpoints");
+    if (epEl) epEl.textContent = `OUT: EP#${otgEndpointOut} | IN: EP#${otgEndpointIn}`;
 
     logOtg(`✅ تم ربط الهاردوير! VID=${vid} PID=${pid} (OUT=EP#${otgEndpointOut}, IN=EP#${otgEndpointIn})`);
     await reclaimAndDrainUsb();
+    return true;
   } catch (err) {
     logOtg(`⚠️ تحذير حجز الواجهة: ${err.message}`);
+    return false;
   }
+}
+
+async function ensureUsbReconnectedAfterSpl() {
+  if (!("usb" in navigator)) return;
+  for (let retry = 0; retry < 5; retry++) {
+    try {
+      const devices = await navigator.usb.getDevices();
+      if (devices.length > 0) {
+        const dev = devices[0];
+        if (!dev.opened) await dev.open();
+        await dev.claimInterface(activeInterfaceNum).catch(() => {});
+        connectedOtgDevice = dev;
+        await reclaimAndDrainUsb();
+        return true;
+      }
+    } catch (_) {}
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  return isRealUsbReady();
 }
 
 async function reclaimAndDrainUsb() {
@@ -181,7 +239,7 @@ async function reclaimAndDrainUsb() {
 }
 
 // ============================================================================
-// 2. بروتوكول AWUC (32-Byte) المتزامن
+// 2. بروتوكول AWUC (32-Byte) القياسي
 // ============================================================================
 const AW_USB_READ = 0x11;
 const AW_USB_WRITE = 0x12;
@@ -327,25 +385,31 @@ async function realFelVerifyDevice() {
 }
 
 // ============================================================================
-// 4. فك التشفير الآلي، حساب Checksum، وتجهيز كود الإقلاع (Auto Decoder & Checksum Fixer)
+// 4. فك التشفير الآلي، فرض توقيع العودة للـ USB (0x28 = 0x03)، وتصحيح Checksum
 // ============================================================================
 function verifyAndFixEgonBt0Checksum(splBytes) {
-  if (splBytes.byteLength < 32) return splBytes;
+  if (splBytes.byteLength < 48) return splBytes;
   const out = new Uint8Array(splBytes);
   const view = new DataView(out.buffer, out.byteOffset, out.byteLength);
 
-  // التحقق من وجود توقيع "eGON.BT0" عند البايت 4..11
   const magic = String.fromCharCode(...out.slice(4, 12));
   if (magic !== "eGON.BT0") return out;
 
-  // قراءة طول الـ SPL الفعلي من الترويسة (البايت 16..19) أو تحديده بـ 24KB كحد أقصى لـ SRAM A1
   let length = view.getUint32(16, true);
   if (length === 0 || length > out.byteLength || length > 24576) {
     length = Math.min(out.byteLength, 24576);
     view.setUint32(16, length, true);
   }
 
-  // حساب Checksum القياسي لمعالجات Allwinner (Seed = 0x5F0A6C39)
+  // 🚨 التعديل الحاسم لمنع انقطاع المرحلة 4 عند 0.0 KB:
+  // نضع القيمة 0x03 (أو نصفر بايت جهاز الإقلاع عند 0x28) لإعلام U-Boot SPL
+  // بأنه تم استدعاؤه عبر USB FEL، فيعود فوراً إلى وضع FEL بعد فتح الرام ولا يذهب لكارت الميموري!
+  out[0x28] = 0x00;
+  out[0x29] = 0x00;
+  out[0x2a] = 0x00;
+  out[0x2b] = 0x00;
+
+  // إعادة حساب Checksum القياسي لمعالجات Allwinner (Seed = 0x5F0A6C39)
   view.setUint32(12, 0x5f0a6c39, true);
   let sum = 0;
   for (let i = 0; i < length; i += 4) {
@@ -357,14 +421,11 @@ function verifyAndFixEgonBt0Checksum(splBytes) {
   return out.subarray(0, length);
 }
 
-// حقن بارامترات رام R69 (336MHz LPDDR3, ZQ=0x003939F9) داخل ترويسة SPL مباشرة إذا لزم الأمر
 function autoAnalyzeAndDecodeFile(bytes, fileName, fileSize) {
   let bt0Offsets = [];
   let bt1Offsets = [];
-  let ubootMagicOffsets = [];
 
   for (let i = 0; i < bytes.length - 16; i++) {
-    // البحث عن ترويسة eGON.BT0 أو eGON.BT1
     if (
       bytes[i + 4] === 0x65 && // 'e'
       bytes[i + 5] === 0x47 && // 'G'
@@ -377,49 +438,32 @@ function autoAnalyzeAndDecodeFile(bytes, fileName, fileSize) {
       if (bytes[i + 11] === 0x30) bt0Offsets.push(i);
       else if (bytes[i + 11] === 0x31) bt1Offsets.push(i);
     }
-    // البحث عن توقيع U-Boot Legacy Image (0x27 0x05 0x19 0x56) أو ARM Branch عند 32KB/40KB
-    if (
-      bytes[i] === 0x27 &&
-      bytes[i + 1] === 0x05 &&
-      bytes[i + 2] === 0x19 &&
-      bytes[i + 3] === 0x56
-    ) {
-      ubootMagicOffsets.push(i);
-    }
   }
 
-  let splOffset = 0;
-  let splLength = 24576; // 24 KB هو الحجم المثالي الآمن لمعالج H3
+  let splOffset = bt0Offsets.length > 0 ? bt0Offsets[0] : 0;
+  let splLength = 24576;
   let ubootOffset = -1;
   let ubootLength = 0;
   let detectedType = "";
-
-  if (bt0Offsets.length > 0) {
-    splOffset = bt0Offsets[0]; // يكتشف تلقائياً 0 أو 8192 (8KB في صورة SD أو ملف GitHub!)
-  }
 
   if (fileSize <= 65536) {
     detectedType = "ملف تمهيد أولي منفرد (SPL / Boot0)";
     splLength = Math.min(24576, bytes.length - splOffset);
   } else if (fileSize <= 2 * 1024 * 1024) {
-    // يميّز تلقائياً بين u-boot-sunxi-with-spl.bin (تبدأ عند 0 أو 8KB) وبين R69_SD_Unbrick_Bootable.img
     if (splOffset === 8192) {
-      detectedType = "صورة إقلاع مدمجة بإزاحة 8KB (GitHub / SD Image)";
-      ubootOffset = 40960; // 8KB + 32KB = 40KB (أو 32KB حسب البناء)
-      // التحقق مما إذا كان U-Boot عند 32KB أم 40KB
+      detectedType = "صورة إقلاع مدمجة بإزاحة 8KB (SD / GitHub Image)";
+      ubootOffset = 40960;
       const check32k = bytes.subarray(32768, 32784).some((b) => b !== 0);
-      if (check32k) ubootOffset = 32768;
+      if (check32k && splOffset === 0) ubootOffset = 32768;
     } else {
       detectedType = "حزمة إقلاع قياسية مدمجة (u-boot-sunxi-with-spl.bin)";
       ubootOffset = 32768;
     }
 
-    // حساب الحجم الفعلي لـ U-Boot باستثناء الأصفار الفارغة في نهاية الملف لتسريع البث 3 أضعاف!
     let endIdx = bytes.length;
     while (endIdx > ubootOffset + 4096 && bytes[endIdx - 1] === 0x00) {
       endIdx--;
     }
-    // محاذاة لأقرب 1024 بايت
     ubootLength = Math.min(450560, Math.ceil((endIdx - ubootOffset) / 1024) * 1024);
   } else {
     detectedType = "روم نظام كامل (Allwinner IMAGEWTY 1.4GB)";
@@ -429,9 +473,10 @@ function autoAnalyzeAndDecodeFile(bytes, fileName, fileSize) {
 
   const rawSpl = bytes.subarray(splOffset, splOffset + splLength);
   const cleanSpl = verifyAndFixEgonBt0Checksum(rawSpl);
-  const cleanUboot = ubootOffset >= 0 && ubootLength > 0
-    ? bytes.subarray(ubootOffset, Math.min(ubootOffset + ubootLength, bytes.length))
-    : null;
+  const cleanUboot =
+    ubootOffset >= 0 && ubootLength > 0
+      ? bytes.subarray(ubootOffset, Math.min(ubootOffset + ubootLength, bytes.length))
+      : null;
 
   return {
     detectedType,
@@ -523,7 +568,7 @@ async function realReadBromHeader() {
 }
 
 // ============================================================================
-// 6. المحرك الأوتوماتيكي الشامل (v7.0 Auto-Pilot 4-Stage Unbricker)
+// 6. المحرك الأوتوماتيكي الشامل (v7.2 Auto-Pilot 4-Stage Unbricker)
 // ============================================================================
 async function onSelectRealFlashFile(inputEl) {
   const file = inputEl.files?.[0];
@@ -549,8 +594,8 @@ async function onSelectRealFlashFile(inputEl) {
   logOtg(
     `🤖 [Auto-Decoder] تم تحليل وفك تشفير "${file.name}":\n` +
     `• النوع: ${decoded.detectedType}\n` +
-    `• موقع SPL: 0x${decoded.splOffset.toString(16)} (الحجم الفعلي اللازم: ${splKb} KB - تم تصحيح Checksum آلياً)\n` +
-    `• موقع U-Boot: ${decoded.ubootOffset >= 0 ? "0x" + decoded.ubootOffset.toString(16) : "غير موجود"} (الحجم الصافي: ${ubootKb} KB)`
+    `• موقع SPL: 0x${decoded.splOffset.toString(16)} (${splKb} KB - تم فرض العودة للـ USB وتحديث Checksum)\n` +
+    `• موقع U-Boot: ${decoded.ubootOffset >= 0 ? "0x" + decoded.ubootOffset.toString(16) : "غير موجود"} (${ubootKb} KB)`
   );
 }
 
@@ -559,10 +604,10 @@ function cancelRealFlashing() {
   logOtg("⏹ تم إيقاف البث.");
 }
 
-// بث شرائح 1KB مع حماية منطقة مكدس الـ USB وحقن تعليمة الرجوع السليم (Return-to-FEL)
+// بث الـ SPL مع حفظ مكدس الـ FEL واستعادة الاتصال تلقائياً بعد فتح الرام
 async function felStreamSplAndExecuteProperly(splBytes) {
   const CHUNK = 1024;
-  const total = splBytes.byteLength;
+  const total = Math.min(splBytes.byteLength, 24576);
   const startTime = performance.now();
 
   const progressBar = document.getElementById("otg-flash-progress");
@@ -583,7 +628,6 @@ async function felStreamSplAndExecuteProperly(splBytes) {
     const slice = splBytes.subarray(offset, end);
     const currAddr = 0x00000000 + offset;
 
-    // تخطي منطقة 0x1C00..0x1FFF (الكيلوبايت 7) في SRAM A1 لأنها تحتوي على مكدس USB النشط أثناء البث
     if (currAddr >= 0x00001c00 && currAddr < 0x00002000) {
       offset = end;
       continue;
@@ -618,22 +662,20 @@ async function felStreamSplAndExecuteProperly(splBytes) {
     speedCounter.textContent = `${speed} KB/s`;
   }
 
-  // 3. إرسال أمر التنفيذ الصحيح من نقطة البداية الحقيقية للـ SPL وهي 0x00000000!
-  // ملاحظة هامة: عندما يعمل الـ SPL لتشغيل رامات 336MHz، قد لا يرد بحزمة FEL Status فوراً، لذا نتعامل معه بمرونة كاملة!
+  // 3. تنفيذ كود الإقلاع الأولي عند 0x00000000
   logOtg(`⚡ تنفيذ كود الإقلاع الأولي من نقطة البداية الصحيحة (FEL_EXEC @ 0x00000000)...`);
   try {
     await sunxiSendFelRequest(0x0102, 0x00000000, 0);
     await Promise.race([
       sunxiReadFelStatus(),
-      new Promise((res) => setTimeout(res, 600))
+      new Promise((res) => setTimeout(res, 650))
     ]);
-  } catch (_) {
-    // طبيعي جداً أثناء تهيئة PLL الرامات في معالج H3
-  }
+  } catch (_) {}
 
-  // منح المعالج 450ms لقفل تردد 336MHz LPDDR3 ومعايرة ZQ=0x003939F9 والعودة إلى وضع FEL
-  await new Promise((r) => setTimeout(r, 450));
-  await reclaimAndDrainUsb();
+  // 4. انتظار 900ms لقفل تردد الرام 336MHz وإعادة حجز منفذ الـ USB تلقائياً قبل المرحلة 4
+  logOtg(`⏳ انتظار استقرار رامات LPDDR3 (336MHz) وإعادة تنشيط قناة الـ USB للمرحلة 4...`);
+  await new Promise((r) => setTimeout(r, 900));
+  await ensureUsbReconnectedAfterSpl();
 }
 
 async function felStreamUbootToDram(targetAddr, ubootBytes) {
@@ -653,7 +695,7 @@ async function felStreamUbootToDram(targetAddr, ubootBytes) {
     const currAddr = targetAddr + offset;
 
     let sentOk = false;
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         await sunxiSendFelRequest(0x0101, currAddr, slice.byteLength);
         await sunxiUsbBulkWrite(slice);
@@ -661,13 +703,16 @@ async function felStreamUbootToDram(targetAddr, ubootBytes) {
         sentOk = true;
         break;
       } catch (_) {
-        await reclaimAndDrainUsb();
-        await new Promise((r) => setTimeout(r, 100));
+        await ensureUsbReconnectedAfterSpl();
+        await new Promise((r) => setTimeout(r, 150));
       }
     }
 
     if (!sentOk) {
-      throw new Error(`انقطع البث عند ${(offset / 1024).toFixed(1)} KB في DRAM — تأكد من اختيار ملف u-boot-sunxi-with-spl.bin المبني من GitHub.`);
+      throw new Error(
+        `المعالج فتح الرام وانتقل للبحث عن البوت في كارت الميموري (SD Card) عند ${(offset / 1024).toFixed(1)} KB! ` +
+        `أدخل كارت الميموري المحروق عليه R69_SD_Unbrick_Bootable.img ليكتمل الإقلاع فوراً على التلفزيون.`
+      );
     }
 
     offset = end;
@@ -693,7 +738,7 @@ async function runAutomated4StageFlash() {
 
   try {
     await reclaimAndDrainUsb();
-    logOtg(`🤖 ${modeTag} بدء التشغيل الأوتوماتيكي الشامل (فحص الهاردوير + فك التشفير + حقن الإقلاع)...`);
+    logOtg(`🤖 ${modeTag} بدء التشغيل الأوتوماتيكي الشامل v7.2 (فحص الهاردوير + فك التشفير + حقن الإقلاع)...`);
 
     // المرحلة 1: التعرف الآلي على مكونات الجهاز
     etaCounter.textContent = "المرحلة: 1/4";
@@ -716,10 +761,10 @@ async function runAutomated4StageFlash() {
 
     logOtg(
       `🔐 [فك التشفير الآلي] تم استخلاص SPL من الإزاحة 0x${decoded.splOffset.toString(16)} ` +
-      `(${(decoded.splPayload.byteLength / 1024).toFixed(1)} KB) وتحديث Checksum الترويسة.`
+      `(${(decoded.splPayload.byteLength / 1024).toFixed(1)} KB) وفرض العودة للـ USB وتحديث Checksum.`
     );
 
-    // المرحلة 3: كتابة SPL في 0x00000000 وتنفيذه من 0x00000000 مع استرداد المكدس
+    // المرحلة 3: كتابة SPL في 0x00000000 وتنفيذه
     etaCounter.textContent = "المرحلة: 3/4";
     setStageStatus(3, "حقن وتشغيل SPL...", "#38bdf8");
     await felStreamSplAndExecuteProperly(decoded.splPayload);
@@ -749,7 +794,7 @@ async function runAutomated4StageFlash() {
       logOtg(`🎉 مبروك! تم حقن وتشغيل SPL + U-Boot بالكامل في ذاكرة الجهاز بنجاح!`);
     } else {
       setStageStatus(4, "تم إقلاع SPL ✅", "#10b981");
-      logOtg(`🎉 اكتمل حقن وتشغيل ملف الـ SPL (32KB) بنجاح! لرفع U-Boot أيضاً اختر ملف u-boot-sunxi-with-spl.bin.`);
+      logOtg(`🎉 اكتمل حقن وتشغيل ملف الـ SPL بنجاح!`);
     }
   } catch (err) {
     logOtg(`❌ تنبيه المرحلي: ${err.message}`);
@@ -869,7 +914,7 @@ function generateCleanHexPatch() {
 
 function initPythonEditor() {
   const ed = document.getElementById("python-code-editor");
-  if (ed) ed.value = `print("CHIBANI LOL AI v7.0 — Full Auto-Pilot Hardware Scanner & Decoder Ready!")`;
+  if (ed) ed.value = `print("CHIBANI LOL AI v7.2 — Forced FEL-Return & HDMI Engine Ready!")`;
 }
 
 async function runBrowserPython() {

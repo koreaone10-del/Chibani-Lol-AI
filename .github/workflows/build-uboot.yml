@@ -1,4 +1,4 @@
-name: Build R69-EMCP v2.0 Auto-Unbrick U-Boot (336MHz LPDDR3)
+name: Build R69-EMCP v2.0 Auto-Unbrick U-Boot (336MHz LPDDR3 + HDMI + FEL)
 
 on:
   workflow_dispatch:
@@ -25,19 +25,24 @@ jobs:
           cd u-boot-r69
           sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/' scripts/dtc/dtc-lexer.l* || true
 
-      - name: 3. Configure R69-EMCP v2.0 (336MHz LPDDR3, ZQ=0x003939f9 & eMMC Support)
+      - name: 3. Configure R69-EMCP v2.0 (336MHz LPDDR3, ZQ=0x003939f9, HDMI & FEL Return)
         run: |
           cd u-boot-r69
           make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- orangepi_one_defconfig
 
-          # ضبط تردد ومعامل رامات R69-EMCP v2.0 الدقيق
+          # ضبط تردد ومعامل رامات R69-EMCP v2.0 الدقيق (LPDDR3 @ 336MHz)
           sed -i 's/CONFIG_DRAM_CLK=.*/CONFIG_DRAM_CLK=336/' .config
           sed -i 's/CONFIG_DRAM_ZQ=.*/CONFIG_DRAM_ZQ=3750393/' .config
           sed -i 's/CONFIG_PYLIBFDT=y/# CONFIG_PYLIBFDT is not set/' .config || true
 
-          # تفعيل دعم ذواكر eMCP / eMMC (المنفذ MMC2 في معالج H3) وأوامر الفرمطة السريعة
+          # تفعيل شاشة التلفزيون (HDMI Video Output) وذواكر eMCP (MMC2) والعودة السليمة لـ USB FEL
           echo "CONFIG_MMC_SUNXI_SLOT_EXTRA=2" >> .config
           echo "CONFIG_SUPPORT_EMMC_BOOT=y" >> .config
+          echo "CONFIG_VIDEO_SUNXI=y" >> .config
+          echo "CONFIG_VIDEO_HDMI=y" >> .config
+          echo "CONFIG_CFB_CONSOLE=y" >> .config
+          echo "CONFIG_VGA_AS_SINGLE_DEVICE=y" >> .config
+          echo "CONFIG_SYS_CONSOLE_IS_IN_ENV=y" >> .config
           echo "CONFIG_CMD_MMC=y" >> .config
           echo "CONFIG_CMD_GPT=y" >> .config
           echo "CONFIG_CMD_PART=y" >> .config
@@ -58,14 +63,14 @@ jobs:
           test -f spl/sunxi-spl.bin
           test -f u-boot.bin
 
-          # 1) بناء ملف u-boot-sunxi-with-spl.bin القياسي للـ OTG (SPL عند 0KB و U-Boot عند 32KB بدون أصفار زائدة)
+          # 1) بناء ملف u-boot-sunxi-with-spl.bin القياسي للـ OTG (SPL عند 0KB و U-Boot عند 32KB بدون حشو زائد)
           cp spl/sunxi-spl.bin u-boot-sunxi-with-spl.bin
           dd if=u-boot.bin of=u-boot-sunxi-with-spl.bin bs=1024 seek=32 conv=notrunc
 
           # 2) بناء ملف SPL النقي وحده (24KB) للاختبار السريع عبر OTG
           cp spl/sunxi-spl.bin r69_spl_336mhz_only.bin
 
-          # 3) بناء صورة كارت الميموري الجاهزة للحرق (SPL عند 8KB = القطاع 16)
+          # 3) بناء صورة كارت الميموري الجاهزة للحرق المباشر (SPL عند 8KB = القطاع 16)
           dd if=/dev/zero of=R69_SD_Unbrick_Bootable.img bs=1M count=1
           dd if=u-boot-sunxi-with-spl.bin of=R69_SD_Unbrick_Bootable.img bs=1024 seek=8 conv=notrunc
 
@@ -74,7 +79,7 @@ jobs:
       - name: 5. Upload R69 Auto-Unbrick Package
         uses: actions/upload-artifact@v4
         with:
-          name: R69-EMCP-v2-AutoPilot-Package
+          name: R69-EMCP-v2-AutoPilot-HDMI-Package
           path: |
             u-boot-r69/u-boot-sunxi-with-spl.bin
             u-boot-r69/r69_spl_336mhz_only.bin

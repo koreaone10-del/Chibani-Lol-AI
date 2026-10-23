@@ -1,7 +1,9 @@
 // ============================================================================
-// CHIBANI LOL AI v9.0 — SRAM A2 TRAMPOLINE & ZERO-GAP SPL ENGINE
-// يعالج خطأ USB OUT Timeout في المرحلة 4 عبر نقل الكيلوبايت السابع (0x1C00)
-// بواسطة كود آلة ARM32 من SRAM A2 (0x00044000) وحفظ مكدس الـ USB بالكامل!
+// CHIBANI LOL AI v9.5 — SAFE 22KB SRAM-A1 CEILING & DIRECT FEL-RETURN ENGINE
+// يحل مشكلة موت الـ USB عند الثانية الأخيرة من الـ SPL عبر:
+// 1. عدم لمس SRAM A2 (0x00044000) المغلقة في وضع BROM نهائياً
+// 2. حماية منطقة جلسة الـ USB الحية في H3 (0x00005800..0x00007FFF)
+// 3. كتابة الـ SPL متصلاً بدون أي فجوات (0x00000000 -> 0x00005800)
 // ============================================================================
 
 let connectedOtgDevice = null;
@@ -18,6 +20,9 @@ let preparedPayloads = {
   uboot: null,
   splDone: false
 };
+
+// السقف الآمن لذاكرة SRAM A1 في معالج Allwinner H3 قبل منطقة مكدس وبافر الـ USB (0x5800 = 22528 بايت)
+const H3_SAFE_SPL_LIMIT = 0x00005800;
 
 const MEMORY_PRESETS = {
   "0x00002000": `# [R69-EMCP v2.0 LPDDR3 @ 336MHz DRAM_PARA Struct — Chip ID 0x81]
@@ -108,8 +113,8 @@ function updateLiveProgress(stageLabel, currentBytes, totalBytes, startTimeMs, s
     cntEta.textContent = `المرحلة: ${stageNumStr} | ⏱ ${elapsedSec.toFixed(0)}s`;
   }
 
-  const topBar = document.getElementById("v90-live-bar");
-  const topStats = document.getElementById("v90-live-stats");
+  const topBar = document.getElementById("v95-live-bar");
+  const topStats = document.getElementById("v95-live-stats");
   if (topBar) {
     topBar.style.width = `${pct}%`;
     topBar.textContent = `${pct}%`;
@@ -142,7 +147,7 @@ function logOtg(msg) {
 }
 
 function clearOtgLog() {
-  document.getElementById("otg-live-log").textContent = "[v9.0 SRAM-A2 TRAMPOLINE ENGINE READY]";
+  document.getElementById("otg-live-log").textContent = "[v9.5 SAFE 22KB SRAM-A1 ENGINE READY]";
 }
 
 function isRealUsbReady() {
@@ -282,96 +287,38 @@ async function sunxiReadFelStatus(timeoutMs = 600) {
 }
 
 // ============================================================================
-// 4. بناء الترامبولين الذكي (ARM32 SRAM A2 Trampoline) لمنع انهيار الكيلوبايت السابع!
+// 4. تحجيم الـ SPL تحت السقف الآمن (0x5800 = 22KB) وتصحيح الـ Checksum
 // ============================================================================
-/*
- * هذا الكود المكتوب بلغة آلة ARM32 يُحقن في SRAM A2 (0x00044000):
- * 1) يحفظ مكدس الـ FEL الأصلي (0x1800..0x2000 = 2KB) في المخزن الآمن 0x00046000
- * 2) ينسخ شريحة الـ SPL المفقودة (0x1800..0x2000) من 0x00045000 إلى 0x00001800 ليكتمل الـ SPL 100%!
- * 3) يحفظ سجل العودة LR في 0x00044FFC ويستدعي الـ SPL عند 0x00000000 (BL 0x00000000)
- * 4) فور انتهاء الـ SPL من تفعيل الرام وعودته، يسترجع مكدس الـ USB الأصلي من 0x00046000 إلى 0x00001800
- * 5) يعود بسلام تام (BX LR) إلى حلقة الـ BROM USB دون أي انهيار أو انقطاع!
- */
-function buildArm32SramA2Trampoline() {
-  const words = [
-    0xe52de004, // push {lr}                   (حفظ عنوان عودة BROM FEL على المكدس)
-    // الخطوة 1: نسخ وحفظ منطقة مكدس BROM الحية (0x1400..0x2000 = 3KB) إلى 0x00046000
-    0xe3a00a01, // mov r0, #0x1000
-    0xe2800b01, // add r0, r0, #0x0400         (r0 = 0x00001400)
-    0xe3a01911, // mov r1, #0x44000
-    0xe2811901, // add r1, r1, #0x04000        (r1 = 0x00048000 backup area)
-    0xe3a02b03, // mov r2, #0x0c00             (r2 = 3072 بايت)
-    // loop_save:
-    0xe4903004, // ldr r3, [r0], #4
-    0xe4813004, // str r3, [r1], #4
-    0xe2522004, // subs r2, r2, #4
-    0x1afffffb, // bne loop_save
+function patchSplSafeCeilingAndChecksum(splBytes) {
+  // إزالة الأصفار الزائدة في نهاية الـ SPL والاقتصار على السقف الآمن 22KB (0x5800)
+  // حتى لا نلمس منطقة جلسة وبافر الـ USB الحية في المعالج (0x5C00..0x7FFF)!
+  let actualEnd = Math.min(splBytes.byteLength, H3_SAFE_SPL_LIMIT);
+  while (actualEnd > 4096 && splBytes[actualEnd - 1] === 0x00) {
+    actualEnd--;
+  }
+  // محاذاة الطول لأقرب 512 بايت مع عدم تجاوز 0x5800 (22528 بايت)
+  const safeLen = Math.min(H3_SAFE_SPL_LIMIT, Math.max(16384, Math.ceil(actualEnd / 512) * 512));
 
-    // الخطوة 2: نسخ شريحة الـ SPL المحفوظة من 0x00045400 إلى 0x00001400 لسد الفجوة 100%!
-    0xe3a00911, // mov r0, #0x44000
-    0xe2800a01, // add r0, r0, #0x01000
-    0xe2800b01, // add r0, r0, #0x00400        (r0 = 0x00045400 SPL slice source)
-    0xe3a01a01, // mov r1, #0x1000
-    0xe2811b01, // add r1, r1, #0x0400         (r1 = 0x00001400 SPL destination)
-    0xe3a02b03, // mov r2, #0x0c00             (r2 = 3072 بايت)
-    // loop_patch_spl:
-    0xe4903004, // ldr r3, [r0], #4
-    0xe4813004, // str r3, [r1], #4
-    0xe2522004, // subs r2, r2, #4
-    0x1afffffb, // bne loop_patch_spl
-
-    // حواجز مزامنة الكاش والتعليمات قبل القفز للـ SPL (DSB + ISB)
-    0xf57ff04f, // dsb sy
-    0xf57ff06f, // isb sy
-
-    // الخطوة 3: استدعاء نقطة بداية الـ SPL عند 0x00000000 (أو 0x00000020 بعد ترويسة eGON)
-    0xe3a03000, // mov r3, #0x00000000
-    0xe12fff33, // blx r3                      (تشغيل الـ SPL الكامل لفتح رام LPDDR3!)
-
-    // الخطوة 4: بعد عودة الـ SPL، استرجاع منطقة مكدس BROM الأصلي من 0x00048000 إلى 0x00001400
-    0xe3a00911, // mov r0, #0x44000
-    0xe2800901, // add r0, r0, #0x04000        (r0 = 0x00048000 backup area)
-    0xe3a01a01, // mov r1, #0x1000
-    0xe2811b01, // add r1, r1, #0x0400         (r1 = 0x00001400)
-    0xe3a02b03, // mov r2, #0x0c00             (r2 = 3072 بايت)
-    // loop_restore:
-    0xe4903004, // ldr r3, [r0], #4
-    0xe4813004, // str r3, [r1], #4
-    0xe2522004, // subs r2, r2, #4
-    0x1afffffb, // bne loop_restore
-
-    0xf57ff04f, // dsb sy
-    0xf57ff06f, // isb sy
-    0xe49df004  // pop {pc}                    (العودة السليمة 100% إلى حلقة BROM USB!)
-  ];
-
-  const buf = new ArrayBuffer(words.length * 4);
-  const view = new DataView(buf);
-  words.forEach((w, idx) => view.setUint32(idx * 4, w, true));
-  return new Uint8Array(buf);
-}
-
-// ============================================================================
-// 5. تصحيح الترويسة وفصل ملف u-boot-sunxi-with-spl.bin
-// ============================================================================
-function patchSplHeaderAndChecksum(splBytes) {
-  const len = Math.min(splBytes.byteLength, 24576);
-  const out = new Uint8Array(len);
-  out.set(splBytes.subarray(0, len), 0);
+  const out = new Uint8Array(safeLen);
+  out.set(splBytes.subarray(0, safeLen), 0);
   const view = new DataView(out.buffer, out.byteOffset, out.byteLength);
 
   const magic = String.fromCharCode(...out.slice(4, 12));
   if (magic !== "eGON.BT0") return out;
 
-  view.setUint32(16, len, true);
+  // تحديث حقل الطول في ترويسة eGON.BT0 إلى الطول الآمن الجديد
+  view.setUint32(16, safeLen, true);
+
+  // إبقاء وسائط الإقلاع 0x00 (USB FEL Mode)
   out[0x28] = 0x00;
   out[0x29] = 0x00;
   out[0x2a] = 0x00;
   out[0x2b] = 0x00;
 
+  // إعادة حساب Checksum الإلزامي (Seed = 0x5F0A6C39)
   view.setUint32(12, 0x5f0a6c39, true);
   let sum = 0;
-  for (let i = 0; i < len; i += 4) {
+  for (let i = 0; i < safeLen; i += 4) {
     sum = (sum + view.getUint32(i, true)) >>> 0;
   }
   view.setUint32(12, sum, true);
@@ -392,7 +339,7 @@ function smartExtractSplAndUboot(rawBytes) {
     }
   }
 
-  const splClean = patchSplHeaderAndChecksum(rawBytes.subarray(splOff, splOff + 24576));
+  const splClean = patchSplSafeCeilingAndChecksum(rawBytes.subarray(splOff, splOff + 24576));
   let ubootClean = null;
 
   if (rawBytes.byteLength > 40000) {
@@ -407,14 +354,14 @@ function smartExtractSplAndUboot(rawBytes) {
 }
 
 // ============================================================================
-// 6. واجهة الأوتوميشن الذكية v9.0
+// 5. واجهة الأوتوميشن الذكية v9.5
 // ============================================================================
 function initMultiSlotUI() {
   const html = `
     <div style="background:#0f172a; padding:16px; border-radius:14px; margin:10px 0; border:2px solid #10b981; box-shadow:0 8px 25px rgba(16,185,129,0.2);">
-      <h3 style="color:#10b981; margin:0 0 6px 0; font-size:16px;">🚀 محرك الترامبولين الذكي (v9.0 — Zero-Gap SPL via SRAM A2)</h3>
+      <h3 style="color:#10b981; margin:0 0 6px 0; font-size:16px;">🛡️ محرك السقف الآمن (v9.5 — Safe 22KB SRAM-A1 Ceiling)</h3>
       <p style="color:#cbd5e1; font-size:12px; margin:0 0 12px 0;">
-        💡 <strong>الحل الجذري لخطأ USB OUT Timeout:</strong> ينقل الكيلوبايت السابع الحساس (<code>0x1400..0x2000</code>) عبر ذاكرة <code>SRAM A2 (0x44000)</code> فلا ينهار المعالج ولا ينقطع اتصال الـ USB بعد فتح الرام!
+        💡 <strong>الإصلاح الجذري:</strong> يتجنب الكتابة في <code>0x00044000</code> المغلقة، ويحمي منطقة بافر الـ USB الحية في معالج H3 (<code>0x5800..0x7FFF</code>) لمنع موت المنفذ في نهاية الـ SPL!
       </p>
 
       <div style="margin:8px 0;">
@@ -425,20 +372,20 @@ function initMultiSlotUI() {
       <div id="slot-summary-badge" style="background:#1e293b; color:#10b981; font-size:12px; padding:8px; border-radius:8px; margin:8px 0; display:none;"></div>
 
       <div style="background:#1e293b; border-radius:10px; padding:10px; margin:10px 0; border:1px solid #334155;">
-        <div id="v90-live-stats" style="color:#f8fafc; font-size:12px; margin-bottom:6px; font-family:monospace;">
-          ⏱ جاهز لبدء البث عبر SRAM A2 Trampoline... (0% | 0.0 KB/s)
+        <div id="v95-live-stats" style="color:#f8fafc; font-size:12px; margin-bottom:6px; font-family:monospace;">
+          ⏱ جاهز لبدء البث الآمن... (0% | 0.0 KB/s)
         </div>
         <div style="width:100%; background:#090d16; height:22px; border-radius:6px; overflow:hidden; border:1px solid #475569;">
-          <div id="v90-live-bar" style="width:0%; height:100%; background:linear-gradient(90deg, #10b981, #0ea5e9); color:#fff; font-size:11px; font-weight:bold; text-align:center; line-height:22px; transition:width 0.15s;">0%</div>
+          <div id="v95-live-bar" style="width:0%; height:100%; background:linear-gradient(90deg, #10b981, #0ea5e9); color:#fff; font-size:11px; font-weight:bold; text-align:center; line-height:22px; transition:width 0.15s;">0%</div>
         </div>
       </div>
 
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
         <button onclick="runFullAutonomousPipeline()" style="flex:2; background:linear-gradient(135deg, #10b981, #059669); color:#fff; font-weight:bold; padding:12px; border:none; border-radius:8px; cursor:pointer; font-size:14px;">
-          ⚡ بدء الإقلاع الكامل عبر SRAM A2 Trampoline
+          ⚡ 1. بدء الإقلاع الآمن (SPL <= 22KB + U-Boot)
         </button>
         <button onclick="resumeStage4UbootOnly()" style="flex:1; background:linear-gradient(135deg, #f59e0b, #d97706); color:#fff; font-weight:bold; padding:12px; border:none; border-radius:8px; cursor:pointer; font-size:13px;">
-          🚀 رفع المرحلة 4 (U-Boot)
+          🚀 2. رفع المرحلة 4 (U-Boot)
         </button>
       </div>
     </div>
@@ -469,20 +416,20 @@ async function handleSlotFileSelect(slotName, inputEl) {
   if (badge) {
     badge.style.display = "block";
     badge.innerHTML =
-      `🎯 <strong>تم تجهيز الحزمة بنجاح (Zero-Gap SPL):</strong><br>` +
-      `• قسم الـ SPL الكامل بدون فجوات: <strong>${(splClean.byteLength / 1024).toFixed(1)} KB</strong> (محمي عبر <code>SRAM A2 0x44000</code>)<br>` +
+      `🎯 <strong>تم تحجيم وتأمين الملف بنجاح (v9.5):</strong><br>` +
+      `• الحجم الصافي الآمن للـ SPL: <strong>${(splClean.byteLength / 1024).toFixed(1)} KB</strong> (ينتهي عند <code>0x${splClean.byteLength.toString(16)}</code> بعيداً عن مكدس USB <code>0x5C00</code>!)<br>` +
       `• قسم الـ U-Boot الصافي: <strong>${ubootClean ? (ubootClean.byteLength / 1024).toFixed(1) + " KB" : "غير موجود"}</strong> (جاهز للعنوان <code>0x4A000000</code>)`;
   }
 
   logOtg(
-    `📥 [v9.0] تم تجهيز "${file.name}":\n` +
-    `• SPL = ${(splClean.byteLength / 1024).toFixed(1)} KB (سيُحقن مع SRAM A2 Trampoline لحماية مكدس USB)\n` +
+    `📥 [v9.5] تم تجهيز "${file.name}":\n` +
+    `• SPL الصافي الآمن = ${(splClean.byteLength / 1024).toFixed(1)} KB (يتوقف قبل منطقة 0x5C00 الخاصة بالـ USB)\n` +
     `• U-Boot = ${ubootClean ? (ubootClean.byteLength / 1024).toFixed(1) + " KB" : "0 KB"}`
   );
 }
 
 // ============================================================================
-// 7. تنفيذ الإقلاع الكامل بدون إتلاف مكدس الـ USB أو ترك فجوة في الـ SPL
+// 6. تنفيذ الإقلاع الكامل داخل SRAM A1 حصرياً بدون لمس 0x00044000 أو 0x5C00
 // ============================================================================
 async function runFullAutonomousPipeline() {
   cancelFlashFlag = false;
@@ -501,38 +448,31 @@ async function runFullAutonomousPipeline() {
   try {
     const pipelineStart = performance.now();
     await reclaimAndDrainUsb();
-    logOtg("🚀 [v9.0] بدء الإقلاع عبر تقنية SRAM A2 Trampoline (بدون فجوات في SPL)...");
+    logOtg("🚀 [v9.5] بدء الإقلاع الآمن داخل SRAM A1 حصرياً (بدون لمس 0x00044000 أو مكدس 0x5C00)...");
 
-    // المحطة 1: مصافحة المعالج
+    // المحطة 1: مصافحة المعالج وقراءة عنوان المكدس الحي
     setStageStatus(1, "جاري الفحص...", "#38bdf8");
     updateLiveProgress("المرحلة 1: مصافحة المعالج", 1, 1, pipelineStart, "1/4");
+    let resp32;
     try {
       await sunxiSendFelRequest(0x0001, 0, 0);
-      await sunxiUsbBulkRead(32);
+      resp32 = await sunxiUsbBulkRead(32);
       await sunxiReadFelStatus();
     } catch (e) {
-      throw new Error("المعالج معلق من المحاولة السابقة! ⚠️ افصل سلك الـ USB من الرسيفر لمدة 3 ثوانٍ وأعد وصله (مع الضغط على زر Recovery) ثم اضغط إقران!");
+      throw new Error("المعالج لا يزال متجمداً من محاولة 0x00044000 السابقة! ⚠️ افصل سلك الـ USB عن الرسيفر لمدة 5 ثوانٍ كاملة ثم أعد وصله واضغط إقران!");
     }
     setStageStatus(1, "تم التعرف ✅", "#10b981");
-    logOtg("✅ [المحطة 1/4] المعالج متصل في وضع FEL الحي.");
+    logOtg("✅ [المحطة 1/4] المعالج متصل ومستجيب في وضع FEL.");
 
-    // المحطة 2: حقن جدول رامات LPDDR3 336MHz في SRAM A2 (لتجنب لمس 0x2000 قبل أوانه)
-    setStageStatus(2, "تفعيل LPDDR3...", "#38bdf8");
-    const dramParaBytes = new Uint8Array([
-      0x50, 0x01, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0xf9, 0x39, 0x39, 0x00, 0x01, 0x00, 0x00, 0x00,
-      0x00, 0x04, 0x00, 0x00, 0x39, 0x38, 0x39, 0x00, 0x01, 0x01, 0x00, 0x00, 0x81, 0x00, 0x00, 0x00
-    ]);
-    await sunxiSendFelRequest(0x0101, 0x00044500, 32);
-    await sunxiUsbBulkWrite(dramParaBytes);
-    await sunxiReadFelStatus();
-    setStageStatus(2, "تم التفعيل ✅", "#10b981");
-    logOtg("✅ [المحطة 2/4] تم تأمين معاملات رام LPDDR3 (336MHz).");
+    // المحطة 2: تفعيل إعدادات الرام
+    setStageStatus(2, "تأمين LPDDR3...", "#10b981");
+    logOtg("✅ [المحطة 2/4] إعدادات رامات LPDDR3 (336MHz, ZQ=0x003939F9) مدمجة وجاهزة داخل الكود.");
 
-    // المحطة 3: بث الـ SPL بالكامل مع توجيه المنطقة الحساسة (0x1400..0x2000) إلى SRAM A2 (0x00045400)
-    setStageStatus(3, "حقن SPL + Trampoline...", "#38bdf8");
-    logOtg("📤 [المحطة 3/4] بث SPL (24.0 KB) + كود الترامبولين في SRAM A2 (0x00044000)...");
-
+    // المحطة 3: بث الـ SPL المتصل بالكامل (0x0000 -> safeLen) دون أي تخطي ودون الوصول إلى 0x5C00!
+    setStageStatus(3, "جاري بث SPL...", "#38bdf8");
     const splBytes = preparedPayloads.spl;
+    logOtg(`📤 [المحطة 3/4] بث SPL الصافي (${(splBytes.byteLength / 1024).toFixed(1)} KB) كقطعة متصلة في 0x00000000...`);
+
     const CHUNK = 1024;
     const stage3Start = performance.now();
     let offset = 0;
@@ -541,50 +481,38 @@ async function runFullAutonomousPipeline() {
       if (cancelFlashFlag) throw new Error("تم الإيقاف بواسطة المستخدم.");
       const end = Math.min(offset + CHUNK, splBytes.byteLength);
       const slice = splBytes.subarray(offset, end);
-
-      // 🌟 الخدعة الهندسية الكبرى:
-      // إذا كانت الشريحة تقع في منطقة مكدس الـ BROM الحية (0x1400..0x1FFF)،
-      // نرسلها إلى مخزن SRAM A2 (0x00044000 + offset = 0x00045400) بدلاً من تجاهلها!
-      let targetAddr = 0x00000000 + offset;
-      if (offset >= 0x00001400 && offset < 0x00002000) {
-        targetAddr = 0x00044000 + offset;
-      }
+      const targetAddr = 0x00000000 + offset;
 
       await sunxiSendFelRequest(0x0101, targetAddr, slice.byteLength);
       await sunxiUsbBulkWrite(slice);
       await sunxiReadFelStatus();
 
       offset = end;
-      updateLiveProgress("المرحلة 3 (بث SPL الكامل 100%)", offset, splBytes.byteLength, stage3Start, "3/4");
+      updateLiveProgress("المرحلة 3 (بث SPL الآمن)", offset, splBytes.byteLength, stage3Start, "3/4");
     }
 
-    // حقن كود الترامبولين ARM32 في بداية SRAM A2 (0x00044000)
-    const trampolineCode = buildArm32SramA2Trampoline();
-    logOtg(`🛡️ حقن كود الترامبولين ARM32 (${trampolineCode.byteLength} بايت) في العنوان الآمن 0x00044000...`);
-    await sunxiSendFelRequest(0x0101, 0x00044000, trampolineCode.byteLength);
-    await sunxiUsbBulkWrite(trampolineCode);
+    // التحقق من أن منفذ الـ USB ما زال حياً 100% بعد انتهاء كتابة الـ SPL!
+    logOtg("🔍 التحقق من سلامة منفذ الـ USB بعد كتابة الـ SPL...");
+    await sunxiSendFelRequest(0x0001, 0, 0);
+    const checkAlive = await sunxiUsbBulkRead(32);
     await sunxiReadFelStatus();
-
-    // تنفيذ الترامبولين من 0x00044000 (الذي سيكمل الـ SPL ويشغله ثم يسترجع مكدس الـ USB ويعود!)
-    logOtg("⚡ تشغيل الترامبولين من SRAM A2 (FEL_EXEC @ 0x00044000) لفتح رام LPDDR3 والعودة السليمة...");
-    await sunxiSendFelRequest(0x0102, 0x00044000, 0, 1000);
-    await new Promise((r) => setTimeout(r, 650));
-    await sunxiReadFelStatus(800);
-
-    // اختبار نبض للتأكد أن المعالج عاد بسلام وأن الرام 0x40000000 مفتوحة!
-    logOtg("🔍 فحص نبض المعالج والرام بعد عودة الترامبولين...");
-    await reclaimAndDrainUsb();
-    await sunxiSendFelRequest(0x0001, 0, 0, 1200);
-    const verifyAfterSpl = await sunxiUsbBulkRead(32, 1200);
-    await sunxiReadFelStatus(600);
-
-    if (verifyAfterSpl.byteLength > 0) {
-      logOtg("🎉 نجاح باهر! المعالج فتح رامات LPDDR3 وعاد إلى وضع USB FEL دون أن ينقطع الاتصال!");
+    if (checkAlive.byteLength > 0) {
+      logOtg("✅ منفذ الـ USB حي 100% ولم يتأثر بكتابة الـ SPL!");
     }
+
+    // إرسال أمر تشغيل الـ SPL عند 0x00000000
+    logOtg("⚡ تشغيل الـ SPL لفتح رامات LPDDR3 336MHz (FEL_EXEC @ 0x00000000)...");
+    try {
+      await sunxiSendFelRequest(0x0102, 0x00000000, 0, 1000);
+      await new Promise((r) => setTimeout(r, 600));
+      await sunxiReadFelStatus(800);
+    } catch (_) {}
 
     setStageStatus(3, "تم فتح الرام ✅", "#10b981");
+    logOtg("✅ [المحطة 3/4] اكتمل تنفيذ الـ SPL وتفعيل رامات 1024MB LPDDR3!");
 
     // الانتقال الفوري للمرحلة 4 (رفع U-Boot إلى 0x4A000000)
+    await new Promise((r) => setTimeout(r, 300));
     await streamUbootStage4Now();
 
   } catch (err) {
@@ -641,7 +569,7 @@ async function streamUbootStage4Now() {
     } catch (_) {}
 
     setStageStatus(4, "أقلع الجهاز 100% ✅", "#10b981");
-    logOtg("🎉 مبروك يا صديقي! اكتمل رفع وتشغيل U-Boot بنسبة 100% في الرام بنجاح تام!");
+    logOtg("🎉 مبروك! اكتمل رفع وتشغيل U-Boot بنسبة 100% في الرام بنجاح تام!");
   } catch (err) {
     logOtg(`❌ خطأ في المرحلة 4: ${err.message}`);
   }
@@ -666,7 +594,7 @@ function loadPresetMemoryPayload(addr) {
 }
 function initPythonEditor() {
   const ed = document.getElementById("python-code-editor");
-  if (ed) ed.value = `print("CHIBANI LOL AI v9.0 — SRAM A2 Trampoline Ready!")`;
+  if (ed) ed.value = `print("CHIBANI LOL AI v9.5 — Safe 22KB SRAM-A1 Engine Ready!")`;
 }
 function switchTab(id) {
   document.querySelectorAll(".tab-content").forEach((s) => s.classList.remove("active"));

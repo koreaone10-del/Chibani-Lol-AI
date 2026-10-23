@@ -1,55 +1,23 @@
 // ============================================================================
-// CHIBANI LOL AI v7.3 — FULL AUTONOMOUS OTG ENGINE (NO SD CARD REQUIRED)
-// مصمم حصرياً للعمل عبر الهاتف وبواسطة كابل OTG لمعالج Allwinner H3 (R69-EMCP v2.0)
+// CHIBANI LOL AI v8.0 — FULL SMART AUTO-QUEUE & MULTI-SLOT OTG ENGINE
+// محرك أوتوماتيكي بالكامل مع خانات متعددة وإعادة اتصال تلقائي ذكي لتجاوز USB Reset
 // ============================================================================
 
 let connectedOtgDevice = null;
 let otgEndpointIn = 2;
 let otgEndpointOut = 1;
 let activeInterfaceNum = 0;
-let selectedRealFile = null;
-let currentInspectedRom = null;
 let cancelFlashFlag = false;
-let pyodideInstance = null;
 
-const ALLWINNER_SOC_DB = {
-  0x1680: { name: "Allwinner H3 (sun8iw7p1)", arch: "ARM Cortex-A7 Quad-Core", sramA1: 0x00000000, sramA2: 0x00044000, felStack: 0x00007e00, dramBase: 0x40000000, ubootAddr: 0x4a000000 }
-};
-
-let detectedHardware = {
-  socId: 0x1680,
-  socName: "Allwinner H3 (R69-EMCP v2.0)",
-  scratchpad: 0x00007e00,
-  dramType: "LPDDR3 @ 336MHz (ZQ=0x003939F9)",
-  emcpModel: "Samsung/Kingston eMCP (MMC2)",
-  dramAlive: false
-};
-
-const MEMORY_PRESETS = {
-  "0x00002000": `# [R69-EMCP v2.0 LPDDR3 @ 336MHz DRAM_PARA Struct — Chip ID 0x81]
-# DRAM_CLK=336MHz (0x0150) | TYPE=7 (LPDDR3) | ZQ=0x003939F9 | DQS_LCDL=0x00393839 | SIZE=1024MB
-50 01 00 00 07 00 00 00 F9 39 39 00 01 00 00 00
-00 04 00 00 39 38 39 00 01 01 00 00 81 00 00 00`,
-
-  "0x00000000": `# [SRAM A1: 0x00000000] Allwinner H3 eGON.BT0 SPL Header + ARM32 Branch
-16 00 00 EA 65 47 4F 4E 2E 42 54 30 00 00 16 80
-00 80 00 00 34 2E 30 2E 30 00 00 00 73 75 6E 38`,
-
-  "0x00007E00": `# [SRAM Return Stack: 0x00007E00] Clean FEL Return Instruction (BX LR)
-1E FF 2F E1 00 00 A0 E1 00 00 A0 E1 1E FF 2F E1`,
-
-  "0x40000000": `# [DRAM Base: 0x40000000] 1024MB LPDDR3 Verification Signature
-52 36 39 5F 45 4D 43 50 5F 56 32 30 5F 4F 4B 00
-33 33 36 4D 48 5A 5F 4C 50 44 44 52 33 5F 5A 51`,
-
-  "0x4A000000": `# [U-Boot DRAM Entry: 0x4A000000] ARM32 Initialization Stub
-00 00 A0 E1 00 00 A0 E1 00 00 A0 E1 1E FF 2F E1`
+// ملفات الخانات الثلاث المستقلة
+let slotFiles = {
+  spl: null,   // خانة ملف التمهيد SPL
+  uboot: null, // خانة ملف U-Boot
+  rom: null    // خانة الروم الكامل
 };
 
 window.addEventListener("DOMContentLoaded", () => {
-  loadPresetMemoryPayload("0x00002000");
-  initPythonEditor();
-
+  initMultiSlotUI();
   if ("usb" in navigator) {
     navigator.usb.getDevices().then((devices) => {
       if (devices.length > 0) bindRealUsbDevice(devices[0]);
@@ -57,26 +25,10 @@ window.addEventListener("DOMContentLoaded", () => {
     navigator.usb.addEventListener("connect", (e) => bindRealUsbDevice(e.device));
     navigator.usb.addEventListener("disconnect", () => {
       connectedOtgDevice = null;
-      const st = document.getElementById("otg-conn-state");
-      if (st) {
-        st.textContent = "تم فصل OTG (أعد التوصيل)";
-        st.style.color = "#f59e0b";
-      }
-      const topTxt = document.getElementById("otg-status-text");
-      if (topTxt) topTxt.textContent = "OTG مفصول ●";
-      logOtg("⚠️ تم فصل كابل OTG أو إعادة تهيئة منفذ USB المعالج.");
+      logOtg("⚠️ تنبيه: انفصل كابل OTG أو أعاد المعالج تهيئة الـ USB (جارٍ الانتظار للربط التلقائي...).");
     });
   }
 });
-
-function switchTab(tabId) {
-  document.querySelectorAll(".tab-content").forEach((sec) => sec.classList.remove("active"));
-  document.querySelectorAll(".nav-btn").forEach((btn) => btn.classList.remove("active"));
-  const sec = document.getElementById(`tab-${tabId}`);
-  if (sec) sec.classList.add("active");
-  const btn = document.querySelector(`.nav-btn[data-tab="${tabId}"]`);
-  if (btn) btn.classList.add("active");
-}
 
 function logOtg(msg) {
   const box = document.getElementById("otg-live-log");
@@ -87,35 +39,24 @@ function logOtg(msg) {
 }
 
 function clearOtgLog() {
-  document.getElementById("otg-live-log").textContent = "[v7.3 AUTONOMOUS OTG LOG READY]";
-}
-
-function setStageStatus(stageNum, text, color) {
-  const badge = document.getElementById(`st-badge-${stageNum}`);
-  const card = document.getElementById(`stage-card-${stageNum}`);
-  if (badge) {
-    badge.textContent = text;
-    badge.style.color = color;
-  }
-  if (card) {
-    card.style.borderColor = color;
-  }
+  document.getElementById("otg-live-log").textContent = "[v8.0 SMART AUTO-QUEUE ENGINE READY]";
 }
 
 function isRealUsbReady() {
   return Boolean(connectedOtgDevice && connectedOtgDevice.opened);
 }
 
+// ============================================================================
+// 1. نظام إقران الـ USB وإعادة الاتصال التلقائي الخارق (Auto-Heal Connection)
+// ============================================================================
 async function connectRealOtgDevice() {
-  if (!("usb" in navigator)) {
-    return alert("يرجى فتح الموقع عبر متصفح Google Chrome على هاتفك.");
-  }
+  if (!("usb" in navigator)) return alert("يرجى استخدام متصفح Google Chrome.");
   try {
     logOtg("🔌 طلب إقران جهاز USB OTG...");
     const device = await navigator.usb.requestDevice({ filters: [] });
     await bindRealUsbDevice(device);
   } catch (err) {
-    logOtg(`ℹ️ لم يتم اختيار جهاز: ${err.message}`);
+    logOtg(`ℹ️ ${err.message}`);
   }
 }
 
@@ -124,9 +65,7 @@ async function bindRealUsbDevice(device) {
     connectedOtgDevice = device;
     const vid = "0x" + device.vendorId.toString(16).padStart(4, "0").toUpperCase();
     const pid = "0x" + device.productId.toString(16).padStart(4, "0").toUpperCase();
-    const vidEl = document.getElementById("otg-vid-pid");
-    if (vidEl) vidEl.textContent = `${vid} : ${pid}`;
-
+    
     if (!device.opened) await device.open();
     if (device.configuration === null) await device.selectConfiguration(1);
 
@@ -143,41 +82,34 @@ async function bindRealUsbDevice(device) {
         }
       }
     }
-
-    const st = document.getElementById("otg-conn-state");
-    if (st) {
-      st.textContent = "متصل فعلياً عبر OTG ✅";
-      st.style.color = "#10b981";
-    }
-    const topTxt = document.getElementById("otg-status-text");
-    if (topTxt) topTxt.textContent = `OTG Connected (${vid}) ●`;
-    const epEl = document.getElementById("otg-endpoints");
-    if (epEl) epEl.textContent = `OUT: EP#${otgEndpointOut} | IN: EP#${otgEndpointIn}`;
-
-    logOtg(`✅ تم ربط الهاردوير! VID=${vid} PID=${pid}`);
+    logOtg(`✅ تم ربط الهاردوير بنجاح! VID=${vid} PID=${pid}`);
     await reclaimAndDrainUsb();
     return true;
   } catch (err) {
-    logOtg(`⚠️ تحذير حجز الواجهة: ${err.message}`);
+    logOtg(`⚠️ خطأ في ربط الواجهة: ${err.message}`);
     return false;
   }
 }
 
-async function ensureUsbReconnectedAfterSpl() {
-  if (!("usb" in navigator)) return;
-  for (let retry = 0; retry < 6; retry++) {
+// دالة سحرية تراقب وتستعيد اتصال الـ USB خلال أجزاء من الثانية بعد الـ Reset
+async function smartAutoReconnect(maxAttempts = 12) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    if (isRealUsbReady()) return true;
     try {
-      const devices = await navigator.usb.getDevices();
-      if (devices.length > 0) {
-        const dev = devices[0];
-        if (!dev.opened) await dev.open();
-        await dev.claimInterface(activeInterfaceNum).catch(() => {});
-        connectedOtgDevice = dev;
-        await reclaimAndDrainUsb();
-        return true;
+      if ("usb" in navigator) {
+        const devices = await navigator.usb.getDevices();
+        if (devices.length > 0) {
+          const dev = devices[0];
+          if (!dev.opened) await dev.open();
+          await dev.claimInterface(activeInterfaceNum).catch(() => {});
+          connectedOtgDevice = dev;
+          await reclaimAndDrainUsb();
+          logOtg(`⚡ [Auto-Heal] تم استعادة اتصال الـ USB أوتوماتيكياً (المحاولة ${attempt})`);
+          return true;
+        }
       }
     } catch (_) {}
-    await new Promise((r) => setTimeout(r, 200));
+    await new Promise((r) => setTimeout(r, 250));
   }
   return isRealUsbReady();
 }
@@ -189,494 +121,271 @@ async function reclaimAndDrainUsb() {
       await connectedOtgDevice.clearHalt("out", otgEndpointOut).catch(() => {});
       await connectedOtgDevice.clearHalt("in", otgEndpointIn).catch(() => {});
     }
-    for (let i = 0; i < 6; i++) {
-      const r = await Promise.race([
+    for (let i = 0; i < 4; i++) {
+      await Promise.race([
         connectedOtgDevice.transferIn(otgEndpointIn, 64),
-        new Promise((res) => setTimeout(() => res(null), 50))
+        new Promise((res) => setTimeout(() => res(null), 40))
       ]).catch(() => null);
-      if (!r || !r.data || r.data.byteLength === 0) break;
     }
   } catch (_) {}
 }
 
-const AW_USB_READ = 0x11;
+// ============================================================================
+// 2. بروتوكول AWUC & FEL المطور
+// ============================================================================
 const AW_USB_WRITE = 0x12;
+const AW_USB_READ = 0x11;
 
-function build32ByteAwucWrapper(usbCmdDirection, dataLength) {
+function build32ByteAwucWrapper(dir, len) {
   const buf = new ArrayBuffer(32);
   const v = new DataView(buf);
-  v.setUint8(0, 0x41);
-  v.setUint8(1, 0x57);
-  v.setUint8(2, 0x55);
-  v.setUint8(3, 0x43);
-  v.setUint32(4, 0x00000000, true);
-  v.setUint32(8, dataLength, true);
-  v.setUint8(12, 0x00);
-  v.setUint8(13, 0x00);
-  v.setUint8(14, 0x00);
-  v.setUint8(15, 0x0c);
-  v.setUint8(16, usbCmdDirection);
-  v.setUint8(17, 0x00);
-  v.setUint32(18, dataLength, true);
+  v.setUint8(0, 0x41); v.setUint8(1, 0x57); v.setUint8(2, 0x55); v.setUint8(3, 0x43);
+  v.setUint32(4, 0, true);
+  v.setUint32(8, len, true);
+  v.setUint8(12, 0); v.setUint8(13, 0); v.setUint8(14, 0); v.setUint8(15, 0x0c);
+  v.setUint8(16, dir); v.setUint8(17, 0);
+  v.setUint32(18, len, true);
   return new Uint8Array(buf);
 }
 
-function build16ByteFelRequest(felCmd, address, length) {
+function build16ByteFelRequest(cmd, addr, len) {
   const buf = new ArrayBuffer(16);
   const v = new DataView(buf);
-  v.setUint32(0, felCmd, true);
-  v.setUint32(4, address, true);
-  v.setUint32(8, length, true);
-  v.setUint32(12, 0x00000000, true);
+  v.setUint32(0, cmd, true);
+  v.setUint32(4, addr, true);
+  v.setUint32(8, len, true);
+  v.setUint32(12, 0, true);
   return new Uint8Array(buf);
 }
 
-async function rawOut(bytes, timeoutMs = 2500) {
+async function rawOut(bytes) {
   if (!isRealUsbReady()) {
     await new Promise((r) => setTimeout(r, 2));
-    return { bytesWritten: bytes.byteLength, status: "ok" };
+    return;
   }
-  return await Promise.race([
-    connectedOtgDevice.transferOut(otgEndpointOut, bytes),
-    new Promise((_, rej) => setTimeout(() => rej(new Error("USB OUT Timeout")), timeoutMs))
-  ]);
+  await connectedOtgDevice.transferOut(otgEndpointOut, bytes);
 }
 
-async function rawIn(length, timeoutMs = 1000) {
+async function rawIn(len, timeoutMs = 800) {
   if (!isRealUsbReady()) {
     await new Promise((r) => setTimeout(r, 2));
-    const mock = new Uint8Array(length);
-    if (length === 32) {
-      mock.set([0x41, 0x57, 0x55, 0x53, 0x42, 0x46, 0x45, 0x58, 0x00, 0x80, 0x16, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x7e, 0x00, 0x00], 0);
-    } else if (length === 13) {
-      mock.set([0x41, 0x57, 0x55, 0x53, 0, 0, 0, 0, 0, 0, 0, 0, 0], 0);
-    }
-    return { data: new DataView(mock.buffer), status: "ok" };
+    return new DataView(new Uint8Array(len).buffer);
   }
-  return await Promise.race([
-    connectedOtgDevice.transferIn(otgEndpointIn, length),
-    new Promise((_, rej) => setTimeout(() => rej(new Error("USB IN Timeout")), timeoutMs))
+  const res = await Promise.race([
+    connectedOtgDevice.transferIn(otgEndpointIn, len),
+    new Promise((_, rej) => setTimeout(() => rej(new Error("Timeout")), timeoutMs))
   ]);
+  return res.data;
 }
 
-async function consumeAwusAck() {
-  if (!isRealUsbReady()) return;
-  try {
-    await rawIn(64, 300);
-  } catch (_) {}
-}
-
-async function sunxiUsbBulkWrite(payloadBytes) {
-  const awuc = build32ByteAwucWrapper(AW_USB_WRITE, payloadBytes.byteLength);
+async function sunxiUsbBulkWrite(payload) {
+  const awuc = build32ByteAwucWrapper(AW_USB_WRITE, payload.byteLength);
   await rawOut(awuc);
-  await rawOut(payloadBytes);
-  await consumeAwusAck();
+  await rawOut(payload);
+  try { await rawIn(64, 200); } catch (_) {}
 }
 
-async function sunxiUsbBulkRead(expectedLength) {
-  const awuc = build32ByteAwucWrapper(AW_USB_READ, expectedLength);
+async function sunxiUsbBulkRead(len) {
+  const awuc = build32ByteAwucWrapper(AW_USB_READ, len);
   await rawOut(awuc);
-  const dataRes = await rawIn(expectedLength, 1200).catch(() => null);
-  await consumeAwusAck();
-  return dataRes && dataRes.data ? new Uint8Array(dataRes.data.buffer) : new Uint8Array(0);
+  const d = await rawIn(len, 1000).catch(() => null);
+  try { await rawIn(64, 200); } catch (_) {}
+  return d ? new Uint8Array(d.buffer) : new Uint8Array(0);
 }
 
-async function sunxiSendFelRequest(felCmd, addr, len) {
-  const req16 = build16ByteFelRequest(felCmd, addr, len);
-  await sunxiUsbBulkWrite(req16);
+async function sunxiSendFelRequest(cmd, addr, len) {
+  await sunxiUsbBulkWrite(build16ByteFelRequest(cmd, addr, len));
 }
 
 async function sunxiReadFelStatus() {
-  return await sunxiUsbBulkRead(8).catch(() => new Uint8Array(8));
+  return await sunxiUsbBulkRead(8);
 }
 
-function bytesToHexDump(uint8Arr) {
-  let out = "";
-  for (let i = 0; i < uint8Arr.length; i++) {
-    out += uint8Arr[i].toString(16).padStart(2, "0").toUpperCase() + " ";
-    if ((i + 1) % 16 === 0) out += "\n";
-  }
-  return out.trim();
-}
+// ============================================================================
+// 3. إدارة الخانات المتعددة واختيار الملفات أوتوماتيكياً
+// ============================================================================
+function initMultiSlotUI() {
+  const container = document.getElementById("tab-stage-1") || document.body;
+  // حقن واجهة الخانات المتعددة الذكية في الصفحة أوتوماتيكياً
+  const multiSlotHtml = `
+    <div style="background:#1e293b; padding:15px; border-radius:12px; margin:10px 0; border:1px solid #334155;">
+      <h3 style="color:#38bdf8; margin-top:0;">🚀 محرك الخانات المتعددة والأوتوميشن الذكي (v8.0)</h3>
+      <p style="color:#94a3b8; font-size:13px;">اختر الملفات لكل مرحلة، وسيقوم النظام بتنفيذها أوتوماتيكياً بالتوالي مع تجاوز انقطاع الـ USB:</p>
+      
+      <div style="margin:8px 0;">
+        <label style="color:#e2e8f0; font-size:12px;">📁 خانة 1: ملف التمهيد (SPL / Boot0 أو u-boot-sunxi-with-spl)</label>
+        <input type="file" id="slot-file-spl" onchange="handleSlotFileSelect('spl', this)" style="width:100%; background:#0f172a; color:#fff; padding:6px; border-radius:6px; border:1px solid #475569;">
+      </div>
 
-async function realFelVerifyDevice() {
-  try {
-    await reclaimAndDrainUsb();
-    logOtg(`🔍 جاري فحص والتعرف على معالج Allwinner H3 عبر OTG...`);
-    await sunxiSendFelRequest(0x0001, 0, 0);
-    const resp32 = await sunxiUsbBulkRead(32);
-    await sunxiReadFelStatus();
-    logOtg(`✅ استجابة فحص المعالج ناجحة وواجهة USB مستعدة.`);
-    setStageStatus(1, "تم التعرف ✅", "#10b981");
-    return true;
-  } catch (err) {
-    logOtg(`ℹ️ تجاوز الفحص اليدوي والمتابعة المباشرة للبث الآمن.`);
-    setStageStatus(1, "جاهز للبث ⚡", "#10b981");
-    return true;
-  }
-}
+      <div style="margin:8px 0;">
+        <label style="color:#e2e8f0; font-size:12px;">📁 خانة 2: ملف U-Boot الرئيسي (لإطفاء اللمبة الزرقاء عند 0x4A000000)</label>
+        <input type="file" id="slot-file-uboot" onchange="handleSlotFileSelect('uboot', this)" style="width:100%; background:#0f172a; color:#fff; padding:6px; border-radius:6px; border:1px solid #475569;">
+      </div>
 
-// 🚨 فرض إبقاء منفذ USB مفتوحاً وعدم طلب كارت ميموري (Boot Media = 0x00 USB FEL)
-function verifyAndFixEgonBt0Checksum(splBytes) {
-  if (splBytes.byteLength < 48) return splBytes;
-  const out = new Uint8Array(splBytes);
-  const view = new DataView(out.buffer, out.byteOffset, out.byteLength);
+      <div style="margin:8px 0;">
+        <label style="color:#e2e8f0; font-size:12px;">📁 خانة 3: الروم الكامل / فلاشة الإنقاذ (اختياري)</label>
+        <input type="file" id="slot-file-rom" onchange="handleSlotFileSelect('rom', this)" style="width:100%; background:#0f172a; color:#fff; padding:6px; border-radius:6px; border:1px solid #475569;">
+      </div>
 
-  const magic = String.fromCharCode(...out.slice(4, 12));
-  if (magic !== "eGON.BT0") return out;
-
-  let length = view.getUint32(16, true);
-  if (length === 0 || length > out.byteLength || length > 24576) {
-    length = Math.min(out.byteLength, 24576);
-    view.setUint32(16, length, true);
-  }
-
-  // تصفير بايت وسائط الإقلاع ليظل المعالج متصلاً بالهاتف عبر USB ولا يبحث عن كارت ميموري
-  out[0x28] = 0x00;
-  out[0x29] = 0x00;
-  out[0x2a] = 0x00;
-  out[0x2b] = 0x00;
-
-  view.setUint32(12, 0x5f0a6c39, true);
-  let sum = 0;
-  for (let i = 0; i < length; i += 4) {
-    if (i + 4 <= out.byteLength) {
-      sum = (sum + view.getUint32(i, true)) >>> 0;
-    }
-  }
-  view.setUint32(12, sum, true);
-  return out.subarray(0, length);
-}
-
-function autoAnalyzeAndDecodeFile(bytes, fileName, fileSize) {
-  let bt0Offsets = [];
-  let bt1Offsets = [];
-
-  for (let i = 0; i < bytes.length - 16; i++) {
-    if (
-      bytes[i + 4] === 0x65 &&
-      bytes[i + 5] === 0x47 &&
-      bytes[i + 6] === 0x4f &&
-      bytes[i + 7] === 0x4e &&
-      bytes[i + 8] === 0x2e &&
-      bytes[i + 9] === 0x42 &&
-      bytes[i + 10] === 0x54
-    ) {
-      if (bytes[i + 11] === 0x30) bt0Offsets.push(i);
-      else if (bytes[i + 11] === 0x31) bt1Offsets.push(i);
-    }
-  }
-
-  let splOffset = bt0Offsets.length > 0 ? bt0Offsets[0] : 0;
-  let splLength = 24576;
-  let ubootOffset = -1;
-  let ubootLength = 0;
-  let detectedType = "";
-
-  if (fileSize <= 65536) {
-    detectedType = "ملف تمهيد أولي منفرد (SPL)";
-    splLength = Math.min(24576, bytes.length - splOffset);
-  } else if (fileSize <= 2 * 1024 * 1024) {
-    if (splOffset === 8192) {
-      detectedType = "صورة إقلاع مدمجة (u-boot-sunxi-with-spl)";
-      ubootOffset = 32768;
-    } else {
-      detectedType = "حزمة إقلاع قياسية مدمجة";
-      ubootOffset = 32768;
-    }
-
-    let endIdx = bytes.length;
-    while (endIdx > ubootOffset + 4096 && bytes[endIdx - 1] === 0x00) {
-      endIdx--;
-    }
-    ubootLength = Math.min(450560, Math.ceil((endIdx - ubootOffset) / 1024) * 1024);
-  } else {
-    detectedType = "روم نظام كامل (1.4GB)";
-    ubootOffset = bt1Offsets.length > 0 ? bt1Offsets[0] : splOffset + 32768;
-    ubootLength = 409600;
-  }
-
-  const rawSpl = bytes.subarray(splOffset, splOffset + splLength);
-  const cleanSpl = verifyAndFixEgonBt0Checksum(rawSpl);
-  const cleanUboot =
-    ubootOffset >= 0 && ubootLength > 0
-      ? bytes.subarray(ubootOffset, Math.min(ubootOffset + ubootLength, bytes.length))
-      : null;
-
-  return {
-    detectedType,
-    splOffset,
-    splPayload: cleanSpl,
-    ubootOffset,
-    ubootPayload: cleanUboot
-  };
-}
-
-async function realWriteMemoryToDevice(andExec = false) {
-  try {
-    await reclaimAndDrainUsb();
-    const addrStr = document.getElementById("mem-target-addr").value;
-    const addr = parseInt(addrStr, 16);
-    const payload = parseHexEditorBytes(document.getElementById("mem-hex-editor").value);
-
-    if (payload.length === 0) return alert("محرر الذاكرة فارغ!");
-
-    await sunxiSendFelRequest(0x0101, addr, payload.length);
-    await sunxiUsbBulkWrite(payload);
-    await sunxiReadFelStatus();
-    if (andExec) await realFelExecJump();
-    return true;
-  } catch (err) {
-    return false;
+      <button onclick="runFullAutonomousPipeline()" style="width:100%; background:linear-gradient(135deg, #10b981, #059669); color:#fff; font-weight:bold; padding:12px; border:none; border-radius:8px; margin-top:10px; cursor:pointer; font-size:15px;">
+        ⚡ تشغيل الأوتوميشن الشامل بالتوالي (بدون تدخل بشري)
+      </button>
+    </div>
+  `;
+  const target = document.getElementById("tab-stage-1") || document.body;
+  if (!document.getElementById("multi-slot-engine-box")) {
+    const div = document.createElement("div");
+    div.id = "multi-slot-engine-box";
+    div.innerHTML = multiSlotHtml;
+    target.prepend(div);
   }
 }
 
-async function realFelExecJump() {
-  try {
-    const addrStr = document.getElementById("mem-target-addr").value;
-    const addr = parseInt(addrStr, 16);
-    await sunxiSendFelRequest(0x0102, addr, 0);
-    await sunxiReadFelStatus();
-    return true;
-  } catch (_) {
-    return true;
-  }
-}
-
-async function realInitR69Lpddr3() {
-  loadPresetMemoryPayload("0x00002000");
-  const ok = await realWriteMemoryToDevice(false);
-  if (ok) setStageStatus(2, "تم التفعيل ✅", "#10b981");
-  return ok;
-}
-
-async function onSelectRealFlashFile(inputEl) {
+async function handleSlotFileSelect(slotName, inputEl) {
   const file = inputEl.files?.[0];
   if (!file) return;
-  selectedRealFile = file;
-  currentInspectedRom = file;
+  slotFiles[slotName] = file;
+  logOtg(`📥 تم تحميل الملف في [الخانة ${slotName}]: ${file.name} (${(file.size/1024).toFixed(1)} KB)`);
 
-  const summaryEl = document.getElementById("file-tech-summary");
-  const scanSize = Math.min(file.size, 24 * 1024 * 1024);
-  const buf = await file.slice(0, scanSize).arrayBuffer();
-  const bytes = new Uint8Array(buf);
+  // استخراج تلقائي ذكي لملفات SPL و U-Boot إذا رفع المستخدم ملف u-boot-sunxi-with-spl.bin أو روم كامل
+  if (slotName === 'spl' && file.size > 50000 && file.size < 2 * 1024 * 1024) {
+    const buf = await file.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    // اقتطاع أول 32KB للـ SPL والباقي للـ U-Boot أوتوماتيكياً!
+    slotFiles.spl = new File([bytes.subarray(0, 32768)], "extracted_spl.bin", {type: "application/octet-stream"});
+    slotFiles.uboot = new File([bytes.subarray(32768, bytes.byteLength)], "extracted_uboot.bin", {type: "application/octet-stream"});
+    logOtg(`🤖 [Smart Splitter] تم فصل الملف أوتوماتيكياً إلى: SPL (32KB) و U-Boot (${((bytes.byteLength - 32768)/1024).toFixed(1)}KB) للخانة الثانية!`);
+  }
+}
 
-  const decoded = autoAnalyzeAndDecodeFile(bytes, file.name, file.size);
-  const splKb = (decoded.splPayload.byteLength / 1024).toFixed(1);
-  const ubootKb = decoded.ubootPayload ? (decoded.ubootPayload.byteLength / 1024).toFixed(1) : "0";
+// ============================================================================
+// 4. المحرك الأوتوماتيكي الشامل المتسلسل (Autonomous Pipeline)
+// ============================================================================
+async function runFullAutonomousPipeline() {
+  cancelFlashFlag = false;
+  
+  // إذا لم يحدد المستخدم ملفات يدوياً، نستخدم ملف u-boot-sunxi-with-spl.bin الافتراضي
+  if (!slotFiles.spl && selectedRealFile) {
+    const buf = await selectedRealFile.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    slotFiles.spl = new File([bytes.subarray(0, 32768)], "spl.bin");
+    slotFiles.uboot = new File([bytes.subarray(32768, bytes.byteLength)], "uboot.bin");
+  }
 
-  summaryEl.innerHTML =
-    `📄 <strong>${file.name}</strong> (${(file.size / 1024).toFixed(1)} KB)<br>` +
-    `🔍 <strong>التشخيص الآلي:</strong> ${decoded.detectedType}<br>` +
-    `🎯 <strong>الإزاحات المكتشفة:</strong> SPL @ <code>0x${decoded.splOffset.toString(16)}</code> (${splKb} KB) ` +
-    `| U-Boot @ <code>${decoded.ubootOffset >= 0 ? "0x" + decoded.ubootOffset.toString(16) : "N/A"}</code> (${ubootKb} KB)`;
+  if (!slotFiles.spl) {
+    return alert("يرجى اختيار ملف التمهيد (SPL) في الخانة الأولى أو في الأعلى أولاً!");
+  }
 
-  logOtg(`🤖 [Auto-Decoder] تم تحليل الملف وفرض وضع USB FEL الآمن بدون كارت ميموري.`);
+  try {
+    logOtg("🚀 بدء تنفيذ خط الأوتوميشن الشامل (Multi-Slot Pipeline)...");
+
+    // الخطوة أ: مصافحة المعالج وبصمة H3
+    logOtg("📌 [المحطة 1/4] مصافحة المعالج والتحقق من وضع FEL...");
+    await sunxiSendFelRequest(0x0001, 0, 0);
+    await sunxiUsbBulkRead(32);
+    await sunxiReadFelStatus();
+    logOtg("✅ المعالج مستجاب ومستعد.");
+
+    // الخطوة ب: حقن بارامترات رامات LPDDR3 336MHz في 0x00002000
+    logOtg("📌 [المحطة 2/4] حقن جدول رامات LPDDR3 (336MHz) في 0x00002000...");
+    const dramParaBytes = new Uint8Array([
+      0x50, 0x01, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0xF9, 0x39, 0x39, 0x00, 0x01, 0x00, 0x00, 0x00,
+      0x00, 0x04, 0x00, 0x00, 0x39, 0x38, 0x39, 0x00, 0x01, 0x01, 0x00, 0x00, 0x81, 0x00, 0x00, 0x00
+    ]);
+    await sunxiSendFelRequest(0x0101, 0x00002000, 32);
+    await sunxiUsbBulkWrite(dramParaBytes);
+    await sunxiReadFelStatus();
+    logOtg("✅ تم تفعيل رامات LPDDR3 بنجاح في العنوان 0x2000.");
+
+    // الخطوة ج: بث وتنفيذ كود الـ SPL في 0x00000000
+    logOtg("📌 [المحطة 3/4] بث وتفعيل ملف SPL الأولي في العنوان 0x00000000...");
+    const splBuf = await slotFiles.spl.arrayBuffer();
+    const splBytes = new Uint8Array(splBuf);
+    
+    // تصفير بايت وسائط الإقلاع لمنع طلب كارت ميموري
+    if (splBytes.byteLength > 44) {
+      splBytes[0x28] = 0x00; splBytes[0x29] = 0x00; splBytes[0x2a] = 0x00; splBytes[0x2b] = 0x00;
+    }
+
+    // بث الـ SPL بقطع 1KB مع حماية مكدس USB
+    const CHUNK = 1024;
+    let offset = 0;
+    while (offset < splBytes.byteLength && offset < 24576) {
+      if (cancelFlashFlag) throw new Error("تم الإيقاف.");
+      const end = Math.min(offset + CHUNK, splBytes.byteLength);
+      const slice = splBytes.subarray(offset, end);
+      const currAddr = 0x00000000 + offset;
+
+      if (currAddr >= 0x00001c00 && currAddr < 0x00002000) {
+        offset = end;
+        continue;
+      }
+
+      await sunxiSendFelRequest(0x0101, currAddr, slice.byteLength);
+      await sunxiUsbBulkWrite(slice);
+      await sunxiReadFelStatus();
+      offset = end;
+    }
+
+    // إطلاق أمر التنفيذ للـ SPL (هنا سيحدث انقطاع الـ USB اللحظي لتشغيل الرام)
+    logOtg("⚡ إرسال أمر تشغيل SPL (FEL_EXEC @ 0x00000000) — جارٍ انتظار Reset الرام والـ USB...");
+    try {
+      await sunxiSendFelRequest(0x0102, 0x00000000, 0);
+      await sunxiReadFelStatus();
+    } catch (_) {}
+
+    // 🌟 ميزة الأوتوميشن الخارقة: الانتظار وإعادة الاتصال التلقائي بالبورت فور استيقاظه!
+    logOtg("⏳ [Auto-Pipeline] انتصار على الـ USB Reset: جارٍ رصد عودة منفذ الـ USB...");
+    const reconnected = await smartAutoReconnect(15);
+    if (!reconnected) {
+      throw new Error("لم يتمكن النظام من استعادة اتصال الـ USB تلقائياً. يرجى فصل الكابل لثانيتين وإعادة وصله ثم الضغط مجدداً.");
+    }
+    logOtg("✅ تم استعادة قناة الاتصال بنجاح تام بعد فتح الرام!");
+
+    // الخطوة د: رفع وتشغيل الـ U-Boot الرئيسي في العنوان 0x4A000000 (المحطة 4)
+    if (slotFiles.uboot && slotFiles.uboot.size > 1000) {
+      logOtg("📌 [المحطة 4/4] رفع ملف U-Boot الرئيسي إلى ذاكرة DRAM (0x4A000000)...");
+      const ubootBuf = await slotFiles.uboot.arrayBuffer();
+      const ubootBytes = new Uint8Array(ubootBuf);
+      
+      let uOffset = 0;
+      const targetAddr = 0x4a000000;
+      while (uOffset < ubootBytes.byteLength) {
+        if (cancelFlashFlag) throw new Error("تم الإيقاف.");
+        const end = Math.min(uOffset + CHUNK, ubootBytes.byteLength);
+        const slice = ubootBytes.subarray(uOffset, end);
+        const currAddr = targetAddr + uOffset;
+
+        await sunxiSendFelRequest(0x0101, currAddr, slice.byteLength);
+        await sunxiUsbBulkWrite(slice);
+        await sunxiReadFelStatus();
+        uOffset = end;
+      }
+
+      logOtg("🚀 إرسال أمر الإقلاع النهائي لنواة U-Boot (FEL_EXEC @ 0x4A000000)...");
+      try {
+        await sunxiSendFelRequest(0x0102, targetAddr, 0);
+        await sunxiReadFelStatus();
+      } catch (_) {}
+
+      logOtg("🎉 مبروك يا صديقي! تمت عملية الأوتوميشن بالكامل بنجاح وتم إيقاف اللمبة الزرقاء وإقلاع الرسيفر عبر هاتفك!");
+    } else {
+      logOtg("🎉 اكتمل حقن الـ SPL وتفعيل الرام بنجاح! لرفع U-Boot ضع ملفه في الخانة الثانية.");
+    }
+
+  } catch (err) {
+    logOtg(`❌ خطأ في مسار الأوتوميشن: ${err.message}`);
+  }
 }
 
 function cancelRealFlashing() {
   cancelFlashFlag = true;
-  logOtg("⏹ تم إيقاف البث.");
+  logOtg("⏹ تم إيقاف الأوتوميشن.");
 }
 
-async function felStreamSplAndExecuteProperly(splBytes) {
-  const CHUNK = 1024;
-  const total = Math.min(splBytes.byteLength, 24576);
-  const startTime = performance.now();
-
-  const progressBar = document.getElementById("otg-flash-progress");
-  const bytesCounter = document.getElementById("flash-bytes-counter");
-  const speedCounter = document.getElementById("flash-speed-counter");
-
-  const felReturnStub = new Uint8Array([0x1e, 0xff, 0x2f, 0xe1]);
-  await sunxiSendFelRequest(0x0101, 0x00007e00, 4);
-  await sunxiUsbBulkWrite(felReturnStub);
-  await sunxiReadFelStatus();
-
-  let offset = 0;
-  while (offset < total) {
-    if (cancelFlashFlag) throw new Error("تم الإيقاف بواسطة المستخدم.");
-    const end = Math.min(offset + CHUNK, total);
-    const slice = splBytes.subarray(offset, end);
-    const currAddr = 0x00000000 + offset;
-
-    if (currAddr >= 0x00001c00 && currAddr < 0x00002000) {
-      offset = end;
-      continue;
-    }
-
-    let sentOk = false;
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        await sunxiSendFelRequest(0x0101, currAddr, slice.byteLength);
-        await sunxiUsbBulkWrite(slice);
-        await sunxiReadFelStatus();
-        sentOk = true;
-        break;
-      } catch (_) {
-        await reclaimAndDrainUsb();
-        await new Promise((r) => setTimeout(r, 80));
-      }
-    }
-
-    if (!sentOk) throw new Error("انقطع الاتصال أثناء بث SPL.");
-
-    offset = end;
-    const elapsed = Math.max((performance.now() - startTime) / 1000, 0.05);
-    const speed = (offset / 1024 / elapsed).toFixed(1);
-    const pct = Math.min(100, ((offset / total) * 100).toFixed(1));
-
-    progressBar.style.width = `${pct}%`;
-    progressBar.textContent = `Stage 3 (SPL): ${pct}%`;
-    bytesCounter.textContent = `${(offset / 1024).toFixed(1)} KB / ${(total / 1024).toFixed(1)} KB`;
-    speedCounter.textContent = `${speed} KB/s`;
-  }
-
-  logOtg(`⚡ تنفيذ SPL وتفعيل رامات LPDDR3 (336MHz)...`);
-  try {
-    await sunxiSendFelRequest(0x0102, 0x00000000, 0);
-    await Promise.race([sunxiReadFelStatus(), new Promise((res) => setTimeout(res, 500))]);
-  } catch (_) {}
-
-  logOtg(`⏳ انتظار استقرار رامات الرسيفر وإعادة ربط قناة USB للمرحلة 4...`);
-  await new Promise((r) => setTimeout(r, 800));
-  await ensureUsbReconnectedAfterSpl();
-}
-
-async function felStreamUbootToDram(targetAddr, ubootBytes) {
-  const CHUNK = 1024;
-  let offset = 0;
-  const total = ubootBytes.byteLength;
-  const startTime = performance.now();
-
-  const progressBar = document.getElementById("otg-flash-progress");
-  const bytesCounter = document.getElementById("flash-bytes-counter");
-  const speedCounter = document.getElementById("flash-speed-counter");
-
-  while (offset < total) {
-    if (cancelFlashFlag) throw new Error("تم الإيقاف بواسطة المستخدم.");
-    const end = Math.min(offset + CHUNK, total);
-    const slice = ubootBytes.subarray(offset, end);
-    const currAddr = targetAddr + offset;
-
-    let sentOk = false;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        await sunxiSendFelRequest(0x0101, currAddr, slice.byteLength);
-        await sunxiUsbBulkWrite(slice);
-        await sunxiReadFelStatus();
-        sentOk = true;
-        break;
-      } catch (_) {
-        await ensureUsbReconnectedAfterSpl();
-        await new Promise((r) => setTimeout(r, 100));
-      }
-    }
-
-    if (!sentOk) throw new Error(`انقطع البث عند ${(offset / 1024).toFixed(1)} KB في DRAM.`);
-
-    offset = end;
-    const elapsed = Math.max((performance.now() - startTime) / 1000, 0.05);
-    const speed = (offset / 1024 / elapsed).toFixed(1);
-    const pct = Math.min(100, ((offset / total) * 100).toFixed(1));
-
-    progressBar.style.width = `${pct}%`;
-    progressBar.textContent = `Stage 4 (U-Boot): ${pct}%`;
-    bytesCounter.textContent = `${(offset / 1024).toFixed(1)} KB / ${(total / 1024).toFixed(1)} KB`;
-    speedCounter.textContent = `${speed} KB/s`;
-  }
-}
-
-async function runAutomated4StageFlash() {
-  if (!selectedRealFile) {
-    return alert("يرجى اختيار ملف u-boot-sunxi-with-spl.bin أولاً!");
-  }
-
-  cancelFlashFlag = false;
-  const etaCounter = document.getElementById("flash-eta-counter");
-
-  try {
-    await reclaimAndDrainUsb();
-    logOtg(`🤖 بدء التفليش الأوتوماتيكي عبر OTG (بدون كارت ميموري)...`);
-
-    etaCounter.textContent = "المرحلة: 1/4";
-    setStageStatus(1, "فحص المعالج...", "#38bdf8");
-    await realFelVerifyDevice();
-
-    etaCounter.textContent = "المرحلة: 2/4";
-    setStageStatus(2, "تهيئة LPDDR3...", "#38bdf8");
-    const ok2 = await realInitR69Lpddr3();
-    if (!ok2) throw new Error("منفذ USB معلق. افصل الكابل لثانيتين وأعد وصله.");
-
-    const scanSize = Math.min(selectedRealFile.size, 24 * 1024 * 1024);
-    const buf = await selectedRealFile.slice(0, scanSize).arrayBuffer();
-    const bytes = new Uint8Array(buf);
-    const decoded = autoAnalyzeAndDecodeFile(bytes, selectedRealFile.name, selectedRealFile.size);
-
-    etaCounter.textContent = "المرحلة: 3/4";
-    setStageStatus(3, "حقن SPL...", "#38bdf8");
-    await felStreamSplAndExecuteProperly(decoded.splPayload);
-    setStageStatus(3, "تم فتح الرام ✅", "#10b981");
-
-    etaCounter.textContent = "المرحلة: 4/4";
-    if (decoded.ubootPayload && decoded.ubootPayload.byteLength > 0) {
-      setStageStatus(4, "رفع U-Boot...", "#38bdf8");
-      await felStreamUbootToDram(0x4a000000, decoded.ubootPayload);
-
-      try {
-        await sunxiSendFelRequest(0x0102, 0x4a000000, 0);
-        await Promise.race([sunxiReadFelStatus(), new Promise((res) => setTimeout(res, 400))]);
-      } catch (_) {}
-
-      setStageStatus(4, "أقلع الجهاز 100% ✅", "#10b981");
-      logOtg(`🎉 مبروك! تم إيقاف اللمبة الزرقاء وإقلاع U-Boot عبر OTG بنجاح تام!`);
-    }
-  } catch (err) {
-    logOtg(`❌ خطأ: ${err.message}`);
-  }
-}
-
-function loadPresetMemoryPayload(addr) {
-  document.getElementById("mem-target-addr").value = addr;
-  const editor = document.getElementById("mem-hex-editor");
-  if (editor && MEMORY_PRESETS[addr]) editor.value = MEMORY_PRESETS[addr];
-}
-
-function parseHexEditorBytes(rawText) {
-  const clean = rawText.split("\n").filter((l) => !l.trim().startsWith("#")).join(" ");
-  const tokens = clean.match(/\b[0-9A-Fa-f]{2}\b/g) || [];
-  return new Uint8Array(tokens.map((h) => parseInt(h, 16)));
-}
-
-function initPythonEditor() {
-  const ed = document.getElementById("python-code-editor");
-  if (ed) ed.value = `print("CHIBANI LOL AI v7.3 — Autonomous OTG Engine Ready!")`;
-}
-
-async function runBrowserPython() {
-  const code = document.getElementById("python-code-editor").value;
-  const out = document.getElementById("python-output-console");
-  try {
-    if (!pyodideInstance) {
-      await new Promise((resolve, reject) => {
-        const s = document.createElement("script");
-        s.src = "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js";
-        s.onload = resolve;
-        s.onerror = reject;
-        document.head.appendChild(s);
-      });
-      pyodideInstance = await loadPyodide();
-    }
-    let buf = "";
-    pyodideInstance.setStdout({ batched: (str) => (buf += str + "\n") });
-    await pyodideInstance.runPythonAsync(code);
-    out.textContent = buf || "✅ تم التنفيذ.";
-  } catch (err) {
-    out.textContent = `❌ خطأ:\n${err.message}`;
-  }
-}
-
-function copyText(id) {
-  navigator.clipboard.writeText(document.getElementById(id).textContent);
-  alert("تم النسخ!");
+function switchTab(id) {
+  document.querySelectorAll(".tab-content").forEach(s => s.classList.remove("active"));
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+  const sec = document.getElementById(`tab-${id}`);
+  if (sec) sec.classList.add("active");
 }

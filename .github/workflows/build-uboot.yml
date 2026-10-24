@@ -11,13 +11,12 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: 1. Install ARM Cross-Compiler & sunxi-tools
+      - name: 1. Install ARM Cross-Compiler & Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             git build-essential gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
-            libc6-dev bison flex bc device-tree-compiler libssl-dev python3 python-is-python3 libusb-1.0-0-dev
-          sudo ln -sf /usr/bin/python3 /usr/bin/python2
+            libc6-dev bison flex bc device-tree-compiler libssl-dev python3 python-is-python3
 
       - name: 2. Clone U-Boot v2019.01
         run: |
@@ -25,36 +24,49 @@ jobs:
           cd u-boot-r69
           sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/' scripts/dtc/dtc-lexer.l* || true
 
-      - name: 3. Configure R69-EMCP v2.0 (LPDDR3 @ 336MHz + HDMI + USB Fastboot)
+      - name: 3. Configure R69-EMCP v2.0 (LPDDR3 @ 336MHz + MUSB OTG + Fastboot)
         run: |
           cd u-boot-r69
           make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- orangepi_one_defconfig
 
-          # ضبط تردد ومعامل رامات R69-EMCP v2.0 (LPDDR3 @ 336MHz, ZQ=0x003939f9)
-          sed -i 's/CONFIG_DRAM_CLK=.*/CONFIG_DRAM_CLK=336/' .config
-          sed -i 's/CONFIG_DRAM_ZQ=.*/CONFIG_DRAM_ZQ=3750393/' .config
+          # 1. تعطيل pylibfdt لمنع أخطاء بايثون
           sed -i 's/CONFIG_PYLIBFDT=y/# CONFIG_PYLIBFDT is not set/' .config || true
 
-          # تفعيل LPDDR3 و eMCP (MMC2) و HDMI و Fastboot للتفليش الكامل عبر OTG
+          # 2. ضبط رامات R69-EMCP v2.0 (LPDDR3 @ 336MHz, ZQ=0x003939f9 = 3750393)
+          sed -i 's/CONFIG_DRAM_CLK=.*/CONFIG_DRAM_CLK=336/' .config
+          sed -i 's/CONFIG_DRAM_ZQ=.*/CONFIG_DRAM_ZQ=3750393/' .config
+          sed -i 's/CONFIG_SUNXI_DRAM_DDR3=y/# CONFIG_SUNXI_DRAM_DDR3 is not set/' .config || true
           echo "CONFIG_SUNXI_DRAM_LPDDR3=y" >> .config
+          echo "CONFIG_SUNXI_DRAM_H3_LPDDR3=y" >> .config
+
+          # 3. تفعيل ذاكرة eMCP الداخلية (MMC Slot 2)
           echo "CONFIG_MMC_SUNXI_SLOT_EXTRA=2" >> .config
           echo "CONFIG_SUPPORT_EMMC_BOOT=y" >> .config
-          echo "CONFIG_VIDEO_SUNXI=y" >> .config
-          echo "CONFIG_VIDEO_HDMI=y" >> .config
+
+          # 4. تفعيل تعريف الهاردوير الفيزيائي لـ Allwinner H3 USB OTG (MUSB Gadget) لحل خطأ السطر 701!
+          echo "CONFIG_USB_MUSB_SUNXI=y" >> .config
+          echo "CONFIG_USB_MUSB_GADGET=y" >> .config
+          echo "CONFIG_USB_MUSB_PIO_ONLY=y" >> .config
           echo "CONFIG_USB_GADGET=y" >> .config
+          echo "CONFIG_USB_GADGET_DUALSPEED=y" >> .config
           echo "CONFIG_USB_GADGET_DOWNLOAD=y" >> .config
+          echo "CONFIG_USB_GADGET_VBUS_DRAW=2" >> .config
+          echo "CONFIG_G_DNL_MANUFACTURER=\"Allwinner\"" >> .config
+          echo "CONFIG_G_DNL_VENDOR_NUM=0x1f3a" >> .config
+          echo "CONFIG_G_DNL_PRODUCT_NUM=0x1010" >> .config
+
+          # 5. تفعيل بروتوكول Fastboot للتفليش عبر OTG
           echo "CONFIG_USB_FUNCTION_FASTBOOT=y" >> .config
+          echo "CONFIG_FASTBOOT=y" >> .config
           echo "CONFIG_FASTBOOT_FLASH=y" >> .config
+          echo "CONFIG_FASTBOOT_FLASH_MMC=y" >> .config
           echo "CONFIG_FASTBOOT_FLASH_MMC_DEV=1" >> .config
           echo "CONFIG_FASTBOOT_BUF_ADDR=0x42000000" >> .config
-          echo "CONFIG_FASTBOOT_BUF_SIZE=0x20000000" >> .config
+          echo "CONFIG_FASTBOOT_BUF_SIZE=0x10000000" >> .config
           echo "CONFIG_CMD_FASTBOOT=y" >> .config
           echo "CONFIG_CMD_MMC=y" >> .config
           echo "CONFIG_CMD_PART=y" >> .config
           echo "CONFIG_CMD_GPT=y" >> .config
-
-          # جعل U-Boot يدخل تلقائياً في وضع استقبال الفلاش عبر USB (Fastboot) إذا أُقلع من FEL
-          sed -i 's/CONFIG_BOOTCOMMAND=.*/CONFIG_BOOTCOMMAND="if test \\"${fel_booted}\\" = \\"1\\"; then echo FEL Boot Detected - Starting USB Fastboot...; fastboot 0; fi; run distro_bootcmd"/' .config || true
 
       - name: 4. Compile SPL & U-Boot
         run: |
@@ -66,10 +78,7 @@ jobs:
             NO_PYTHON=1 \
             HOSTCC="gcc -O2 -idirafter /usr/include -idirafter /usr/include/x86_64-linux-gnu -fcommon" \
             HOSTLDFLAGS="-fcommon" \
-            u-boot.bin spl/u-boot-spl
-
-          cp spl/sunxi-spl.bin u-boot-sunxi-with-spl.bin
-          dd if=u-boot.bin of=u-boot-sunxi-with-spl.bin bs=1024 seek=32 conv=notrunc
+            all
 
       - name: 5. Upload R69 LPDDR3 Fastboot Package
         uses: actions/upload-artifact@v4
@@ -79,3 +88,4 @@ jobs:
             u-boot-r69/u-boot-sunxi-with-spl.bin
             u-boot-r69/spl/sunxi-spl.bin
             u-boot-r69/u-boot.bin
+            u-boot-r69/u-boot-dtb.bin

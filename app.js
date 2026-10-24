@@ -1,13 +1,11 @@
 // ============================================================================
-// CHIBANI LOL AI v17.2 — CUSTOMIZABLE FES1 LOADER & U-BOOT STREAMER
+// CHIBANI LOL AI v18.0 — THE ULTIMATE SMART FEL PROBER & DRAM TESTER
 // ============================================================================
 
 // --- [منطقة التخصيص] ---
-// جرب تغيير عنوان تحميل FES1 هنا (0x20000 أو 0x10000 أو 0x40000)
-const FES1_LOAD_ADDR = 0x20000; 
-
-// جرب تغيير حجم الكتلة هنا (512، 1024، 2048)
-const CHUNK_SIZE = 1024; 
+const CHUNK_SIZE = 1024; // حجم الكتلة المناسب لـ WebUSB
+// العناوين التي سيتم تجربتها تلقائياً لتشغيل FES1 وتهيئة الرام
+const FES1_PROBE_ADDRESSES = [0x00000000, 0x20000, 0x10000, 0x2000]; 
 // ------------------------
 
 let connectedOtgDevice = null;
@@ -16,6 +14,7 @@ let otgEndpointOut = 1;
 let activeInterfaceNum = 0;
 let selectedRealFile = null;
 let cancelFlashFlag = false;
+let currentFes1Addr = 0; // لتخزين العنوان الذي نجح
 
 let preparedPayloads = {
   fes1: null,
@@ -23,7 +22,7 @@ let preparedPayloads = {
 };
 
 window.addEventListener("DOMContentLoaded", () => {
-  initV17UI();
+  initV18UI();
   if ("usb" in navigator) {
     navigator.usb.getDevices().then((devs) => {
       if (devs.length > 0) bindRealUsbDevice(devs[0]);
@@ -55,31 +54,37 @@ function updateConnectionVisuals(isConnected, vid = "0x1F3A", pid = "0xEFE8") {
   }
 }
 
-function updateLiveProgress(stageLabel, currentBytes, totalBytes, startTimeMs) {
+function updateLiveProgress(stageLabel, currentBytes, totalBytes, startTimeMs, color = "#10b981") {
   const pct = totalBytes > 0 ? Math.min(100, ((currentBytes / totalBytes) * 100).toFixed(1)) : 0;
   const elapsedSec = Math.max((performance.now() - startTimeMs) / 1000, 0.1);
   const speedKbs = (currentBytes / 1024 / elapsedSec).toFixed(1);
 
   const topBar = document.getElementById("v170-live-bar");
   const topStats = document.getElementById("v170-live-stats");
-  if (topBar) { topBar.style.width = `${pct}%`; topBar.textContent = `${pct}%`; }
+  if (topBar) { 
+    topBar.style.width = `${pct}%`; 
+    topBar.textContent = `${pct}%`; 
+    topBar.style.background = `linear-gradient(90deg, ${color}, #0ea5e9)`;
+  }
   if (topStats) {
     topStats.textContent = `📊 ${stageLabel} | 📦 ${(currentBytes / 1024).toFixed(1)}/${(totalBytes / 1024).toFixed(1)} KB | 🚀 ${speedKbs} KB/s | ⏱ ${elapsedSec.toFixed(0)}s`;
   }
 }
 
-function logAi(msg) {
+function logAi(msg, type = "info") {
   const box = document.getElementById("otg-live-log");
-  if (box) { box.textContent += `\n[${new Date().toLocaleTimeString()}] ${msg}`; box.scrollTop = box.scrollHeight; }
   const aiConsole = document.getElementById("ai-brain-console");
-  if (aiConsole) { aiConsole.textContent += `\n[${new Date().toLocaleTimeString()}] ${msg}`; aiConsole.scrollTop = aiConsole.scrollHeight; }
-}
-
-function clearOtgLog() {
-  const box = document.getElementById("otg-live-log");
-  if (box) box.textContent = "[v17.2 ENGINE READY]";
-  const aiConsole = document.getElementById("ai-brain-console");
-  if (aiConsole) aiConsole.textContent = "[v17.2 ENGINE INITIALIZED]";
+  
+  let prefix = "ℹ️";
+  if (type === "success") prefix = "✅";
+  if (type === "error") prefix = "❌";
+  if (type === "warning") prefix = "⚠️";
+  if (type === "probe") prefix = "🔍";
+  
+  const logMsg = `[${new Date().toLocaleTimeString()}] ${prefix} ${msg}`;
+  
+  if (box) { box.textContent += `\n${logMsg}`; box.scrollTop = box.scrollHeight; }
+  if (aiConsole) { aiConsole.textContent += `\n${logMsg}`; aiConsole.scrollTop = aiConsole.scrollHeight; }
 }
 
 function isRealUsbReady() {
@@ -91,7 +96,7 @@ async function connectRealOtgDevice() {
   try {
     const device = await navigator.usb.requestDevice({ filters: [] });
     await bindRealUsbDevice(device);
-  } catch (err) { logAi(`ℹ️ ${err.message}`); }
+  } catch (err) { logAi(`فشل الاتصال: ${err.message}`, "error"); }
 }
 
 async function bindRealUsbDevice(device) {
@@ -117,7 +122,7 @@ async function bindRealUsbDevice(device) {
       }
     }
     updateConnectionVisuals(true, vid, pid);
-    logAi(`✅ تم ربط الهاردوير! VID=${vid} PID=${pid}`);
+    logAi(`تم ربط الهاردوير بنجاح! VID=${vid} PID=${pid}`, "success");
     await reclaimAndDrainUsb();
     return true;
   } catch (err) { updateConnectionVisuals(false); return false; }
@@ -139,6 +144,7 @@ async function reclaimAndDrainUsb() {
   } catch (_) {}
 }
 
+// ================== بروتوكول FEL الأساسي ==================
 const AW_USB_WRITE = 0x12;
 const AW_USB_READ = 0x11;
 
@@ -202,20 +208,38 @@ async function sunxiReadFelStatus(timeoutMs = 1500) {
   return await sunxiUsbBulkRead(8, timeoutMs).catch(() => new Uint8Array(8));
 }
 
-// ==========================================
-// التعديل الجوهري: استخدام متغير CHUNK_SIZE القابل للتغيير
-// ==========================================
+// دالة الكتابة الذكية مع إعادة المحاولة
 async function felWriteMemory(addr, bytes, timeoutMs = 5000) {
   for (let offset = 0; offset < bytes.byteLength; offset += CHUNK_SIZE) {
     if (cancelFlashFlag) throw new Error("تم الإيقاف بواسطة المستخدم.");
     const chunk = bytes.subarray(offset, Math.min(offset + CHUNK_SIZE, bytes.byteLength));
     
-    await sunxiSendFelRequest(0x0101, addr + offset, chunk.byteLength, timeoutMs);
-    await sunxiUsbBulkWrite(chunk, timeoutMs);
-    await sunxiReadFelStatus(timeoutMs);
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        await sunxiSendFelRequest(0x0101, addr + offset, chunk.byteLength, timeoutMs);
+        await sunxiUsbBulkWrite(chunk, timeoutMs);
+        await sunxiReadFelStatus(timeoutMs);
+        break; // نجحت العملية
+      } catch (e) {
+        retries--;
+        if (retries === 0) throw e;
+        logAi(`إعادة محاولة الكتابة عند ${(addr+offset).toString(16)}...`, "warning");
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
   }
 }
 
+// دالة القراءة من الذاكرة (لاختبار الرام)
+async function felReadMemory(addr, len, timeoutMs = 5000) {
+  await sunxiSendFelRequest(0x0103, addr, len, timeoutMs);
+  const data = await sunxiUsbBulkRead(len, timeoutMs);
+  await sunxiReadFelStatus(timeoutMs);
+  return data;
+}
+
+// ================== استخراج الملفات ==================
 async function parseRomOrBinFile(file) {
   const buf = await file.slice(0, file.size).arrayBuffer();
   const rawBytes = new Uint8Array(buf);
@@ -226,60 +250,47 @@ async function parseRomOrBinFile(file) {
 
   if (file.size > 10 * 1024 * 1024) {
     for (let i = 0; i < Math.min(rawBytes.byteLength - 64, 48 * 1024 * 1024); i += 4) {
-      if (
-        rawBytes[i+4] === 0x65 && rawBytes[i+5] === 0x47 &&
-        rawBytes[i+6] === 0x4f && rawBytes[i+7] === 0x4e &&
-        rawBytes[i+8] === 0x2e && rawBytes[i+9] === 0x42 &&
-        rawBytes[i+10] === 0x54 && rawBytes[i+11] === 0x30
-      ) {
+      if (rawBytes[i+4] === 0x65 && rawBytes[i+5] === 0x47 && rawBytes[i+6] === 0x4f && rawBytes[i+7] === 0x4e) {
         const len = view.getUint32(i + 16, true);
-        if (len >= 8192 && len <= 32768) {
-          fes1Bytes = rawBytes.subarray(i, i + len);
-          break;
-        }
+        if (len >= 8192 && len <= 32768) { fes1Bytes = rawBytes.subarray(i, i + len); break; }
       }
     }
     for (let i = 0; i < rawBytes.byteLength - 64; i += 4) {
-      if (
-        rawBytes[i] === 0x51 && rawBytes[i+1] === 0x23 && rawBytes[i+2] === 0x56 && rawBytes[i+3] === 0x78 ||
-        rawBytes[i] === 0x00 && rawBytes[i+1] === 0x00 && rawBytes[i+2] === 0xa0 && rawBytes[i+3] === 0xe1
-      ) {
+      if (rawBytes[i] === 0x51 && rawBytes[i+1] === 0x23 && rawBytes[i+2] === 0x56 && rawBytes[i+3] === 0x78 ||
+          rawBytes[i] === 0x00 && rawBytes[i+1] === 0x00 && rawBytes[i+2] === 0xa0 && rawBytes[i+3] === 0xe1) {
         const candidate = rawBytes.subarray(i, Math.min(i + 450560, rawBytes.byteLength));
-        if (candidate.byteLength > 100000) {
-          ubootBytes = candidate;
-          break;
-        }
+        if (candidate.byteLength > 100000) { ubootBytes = candidate; break; }
       }
     }
-    if (!ubootBytes) {
-      ubootBytes = rawBytes.subarray(32 * 1024 * 1024, Math.min(32 * 1024 * 1024 + 450560, rawBytes.byteLength));
-    }
+    if (!ubootBytes) ubootBytes = rawBytes.subarray(32 * 1024 * 1024, Math.min(32 * 1024 * 1024 + 450560, rawBytes.byteLength));
   } else {
     fes1Bytes = rawBytes.subarray(0, 24576);
     ubootBytes = rawBytes.subarray(32768, rawBytes.byteLength);
   }
-
   return { fes1Bytes, ubootBytes };
 }
 
-function initV17UI() {
+function initV18UI() {
   const html = `
-    <div style="background:linear-gradient(145deg, #090d16, #0f172a); padding:16px; border-radius:14px; margin:10px 0; border:2px solid #10b981; box-shadow:0 8px 30px rgba(16,185,129,0.25);">
-      <h3 style="color:#10b981; margin:0 0 6px 0; font-size:16px;">🔥 المحرك الجراحي النهائي (v17.2 — Customizable)</h3>
+    <div style="background:linear-gradient(145deg, #090d16, #0f172a); padding:16px; border-radius:14px; margin:10px 0; border:2px solid #8b5cf6; box-shadow:0 8px 30px rgba(139,92,246,0.25);">
+      <h3 style="color:#a78bfa; margin:0 0 6px 0; font-size:16px;">🧠 المحرك الخارق v18.0 (Smart FEL Prober & DRAM Tester)</h3>
       <div style="margin:8px 0;">
-        <label style="color:#38bdf8; font-weight:bold; font-size:12px;">📦 اختر ملف الروم الكامل (1.4GB) أو ملف u-boot-sunxi-with-spl.bin:</label>
-        <input type="file" id="slot-file-spl" onchange="handleSlotFileSelect('spl', this)" style="width:100%; background:#1e293b; color:#fff; padding:8px; border-radius:8px; border:1px solid #10b981; margin-top:4px;">
+        <label style="color:#38bdf8; font-weight:bold; font-size:12px;">📦 اختر ملف الروم الكامل أو ملف u-boot-sunxi-with-spl.bin:</label>
+        <input type="file" id="slot-file-spl" onchange="handleSlotFileSelect('spl', this)" style="width:100%; background:#1e293b; color:#fff; padding:8px; border-radius:8px; border:1px solid #8b5cf6; margin-top:4px;">
       </div>
-      <div id="slot-summary-badge" style="background:#1e293b; color:#10b981; font-size:12px; padding:8px; border-radius:8px; margin:8px 0; display:none;"></div>
-      <pre id="ai-brain-console" style="background:#050811; color:#34d399; font-size:11px; padding:10px; border-radius:8px; border:1px solid #065f46; max-height:140px; overflow-y:auto; margin:8px 0; font-family:monospace; white-space:pre-wrap;">[v17.2 Ready] اختر الملف للبدء...</pre>
+      <div id="slot-summary-badge" style="background:#1e293b; color:#a78bfa; font-size:12px; padding:8px; border-radius:8px; margin:8px 0; display:none;"></div>
+      
       <div style="background:#1e293b; border-radius:10px; padding:10px; margin:10px 0; border:1px solid #334155;">
         <div id="v170-live-stats" style="color:#f8fafc; font-size:12px; margin-bottom:6px; font-family:monospace;">⏱ بانتظار التشغيل...</div>
         <div style="width:100%; background:#090d16; height:22px; border-radius:6px; overflow:hidden; border:1px solid #475569;">
-          <div id="v170-live-bar" style="width:0%; height:100%; background:linear-gradient(90deg, #10b981, #0ea5e9); color:#fff; font-size:11px; font-weight:bold; text-align:center; line-height:22px;">0%</div>
+          <div id="v170-live-bar" style="width:0%; height:100%; background:linear-gradient(90deg, #8b5cf6, #0ea5e9); color:#fff; font-size:11px; font-weight:bold; text-align:center; line-height:22px;">0%</div>
         </div>
       </div>
-      <button onclick="runNativeFes1AndUbootStream()" style="width:100%; background:linear-gradient(135deg, #10b981, #059669); color:#fff; font-weight:bold; padding:12px; border:none; border-radius:8px; cursor:pointer; font-size:14px;">
-        🔥 1. تشغيل FES1 (فتح الرام) + رفع U-Boot إلى 0x4A000000
+      
+      <pre id="ai-brain-console" style="background:#050811; color:#a78bfa; font-size:11px; padding:10px; border-radius:8px; border:1px solid #4c1d95; max-height:160px; overflow-y:auto; margin:8px 0; font-family:monospace; white-space:pre-wrap;">[v18.0 Ready] المحرك الذكي جاهز لفحص وتفليش الجهاز...</pre>
+      
+      <button onclick="runSmartProbingSequence()" style="width:100%; background:linear-gradient(135deg, #8b5cf6, #6d28d9); color:#fff; font-weight:bold; padding:12px; border:none; border-radius:8px; cursor:pointer; font-size:14px; box-shadow: 0 4px 15px rgba(139,92,246,0.4);">
+        🚀 بدء الفحص الذكي وتفليش U-Boot
       </button>
     </div>
   `;
@@ -304,11 +315,34 @@ async function handleSlotFileSelect(slotName, inputEl) {
   const badge = document.getElementById("slot-summary-badge");
   if (badge) {
     badge.style.display = "block";
-    badge.innerHTML = `🎯 <strong>تم استخراج ملفات التمهيد (v17.2):</strong> FES1 = ${(fes1Bytes?.byteLength/1024).toFixed(1)} KB | U-Boot = ${(ubootBytes?.byteLength/1024).toFixed(1)} KB`;
+    badge.innerHTML = `🎯 <strong>الملفات المستخرجة:</strong> FES1 = ${(fes1Bytes?.byteLength/1024).toFixed(1)} KB | U-Boot = ${(ubootBytes?.byteLength/1024).toFixed(1)} KB`;
   }
 }
 
-async function runNativeFes1AndUbootStream() {
+// ================== الاختبار الذكي (DRAM Test) ==================
+async function verifyDram() {
+  const testAddr = 0x40000000; // عنوان آمن في الرام
+  const testPattern = new Uint8Array([0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE]);
+  
+  try {
+    // 1. كتابة النمط
+    await felWriteMemory(testAddr, testPattern, 2000);
+    
+    // 2. قراءته
+    const readBack = await felReadMemory(testAddr, testPattern.length, 2000);
+    
+    // 3. المقارنة
+    if (readBack.length !== testPattern.length) return false;
+    for (let i = 0; i < testPattern.length; i++) {
+      if (readBack[i] !== testPattern[i]) return false;
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function runSmartProbingSequence() {
   if (!preparedPayloads.fes1 || !preparedPayloads.uboot) {
     if (selectedRealFile) {
       const parsed = await parseRomOrBinFile(selectedRealFile);
@@ -326,25 +360,50 @@ async function runNativeFes1AndUbootStream() {
   try {
     const startMs = performance.now();
     await reclaimAndDrainUsb();
-    logAi(`🔥 [v17.2] بدء الإيقاظ... (FES1 @ ${FES1_LOAD_ADDR.toString(16)}, Chunk: ${CHUNK_SIZE})`);
+    logAi("🚀 بدء تسلسل الفحص الذكي...", "info");
 
     await sunxiSendFelRequest(0x0001, 0, 0);
     await sunxiUsbBulkRead(32);
     await sunxiReadFelStatus();
 
-    logAi(`⏳ جاري حقن FES1 في العنوان ${FES1_LOAD_ADDR.toString(16)}...`);
-    const fes1 = preparedPayloads.fes1;
-    await felWriteMemory(FES1_LOAD_ADDR, fes1, 5000);
+    let dramSuccess = false;
+    
+    // --- 1. مرحلة البحث عن العنوان الصحيح لـ FES1 ---
+    for (const addr of FES1_PROBE_ADDRESSES) {
+      if (cancelFlashFlag) throw new Error("تم الإيقاف.");
+      logAi(`🔍 فحص عنوان FES1: ${addr.toString(16).toUpperCase()}...`, "probe");
+      
+      try {
+        // حقن FES1
+        await felWriteMemory(addr, preparedPayloads.fes1, 3000);
+        
+        // تنفيذ
+        try { await sunxiSendFelRequest(0x0102, addr, 0, 1500); } catch (_) {}
+        await new Promise(r => setTimeout(r, 500)); 
+        
+        // اختبار الرام
+        const isRamAlive = await verifyDram();
+        if (isRamAlive) {
+          logAi(`🎉 نجحت التهيئة! الرامات تستجيب في العنوان ${addr.toString(16).toUpperCase()}`, "success");
+          currentFes1Addr = addr;
+          dramSuccess = true;
+          break;
+        } else {
+          logAi(`❌ الرامات لم تستجب مع العنوان ${addr.toString(16).toUpperCase()}`, "warning");
+        }
+      } catch (err) {
+        logAi(`فشل الاتصال عند ${addr.toString(16).toUpperCase()}: ${err.message}`, "warning");
+      }
+    }
 
-    logAi(`🚀 تنفيذ FES1 لتهيئة DRAM...`);
-    try {
-      await sunxiSendFelRequest(0x0102, FES1_LOAD_ADDR, 0, 3000);
-      await sunxiReadFelStatus(2000);
-    } catch (_) {}
+    if (!dramSuccess) {
+      logAi("🚨 فشلت جميع المحاولات! الرامات لا تستجيب.", "error");
+      logAi("💡 تأكد من أن ملف U-Boot مبني بـ LPDDR3 وأن إعدادات ZQ صحيحة (راجع النقاشات).", "warning");
+      return; // إيقاف العملية
+    }
 
-    await new Promise((res) => setTimeout(res, 1500));
-
-    logAi(`📤 بدء رفع U-Boot...`);
+    // --- 2. مرحلة رفع U-Boot (بعد نجاح الرام) ---
+    logAi(`📤 بدء رفع U-Boot إلى 0x4A000000...`, "info");
     const uboot = preparedPayloads.uboot;
     const total = uboot.byteLength;
     const targetAddr = 0x4a000000;
@@ -358,17 +417,17 @@ async function runNativeFes1AndUbootStream() {
       await felWriteMemory(targetAddr + uOffset, slice, 5000);
       
       uOffset = end;
-      updateLiveProgress("رفع U-Boot", uOffset, total, startMs);
+      updateLiveProgress("رفع U-Boot", uOffset, total, startMs, "#8b5cf6");
     }
 
-    logAi(`✅ اكتمل رفع U-Boot. جاري التنفيذ...`);
+    logAi(`✅ اكتمل الرفع. جاري تشغيل U-Boot...`, "success");
     try {
       await sunxiSendFelRequest(0x0102, targetAddr, 0, 3000);
       await sunxiReadFelStatus(2000);
     } catch (_) {}
 
-    logAi("🎉 تم إيقاف الجهاز وتشغيل U-Boot بنجاح!");
+    logAi("🎉 تم إيقاف الجهاز وتشغيل U-Boot بنجاح!", "success");
   } catch (err) {
-    logAi(`❌ خطأ: ${err.message}`);
+    logAi(`خطأ قاتل: ${err.message}`, "error");
   }
 }

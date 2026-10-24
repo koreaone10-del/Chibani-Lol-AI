@@ -1,6 +1,5 @@
 // ============================================================================
-// CHIBANI LOL AI v17.0 — NATIVE FES1 DRAM UNLOCKER & DIRECT U-BOOT STREAMER
-// يرفع ملف fes1.fex الأصلي (15.2 KB) لفتح رامات LPDDR3 عتادياً، ثم يرفع U-Boot إلى 0x4A000000
+// CHIBANI LOL AI v17.1 — NATIVE FES1 DRAM UNLOCKER & DIRECT U-BOOT STREAMER
 // ============================================================================
 
 let connectedOtgDevice = null;
@@ -9,6 +8,9 @@ let otgEndpointOut = 1;
 let activeInterfaceNum = 0;
 let selectedRealFile = null;
 let cancelFlashFlag = false;
+
+// عنوان تحميل FES1: جرب 0x20000 أو 0x10000 إذا فشل 0x00000000
+const FES1_LOAD_ADDR = 0x00000000; 
 
 let preparedPayloads = {
   fes1: null,
@@ -70,9 +72,9 @@ function logAi(msg) {
 
 function clearOtgLog() {
   const box = document.getElementById("otg-live-log");
-  if (box) box.textContent = "[v17.0 ENGINE READY]";
+  if (box) box.textContent = "[v17.1 ENGINE READY]";
   const aiConsole = document.getElementById("ai-brain-console");
-  if (aiConsole) aiConsole.textContent = "[v17.0 ENGINE INITIALIZED]";
+  if (aiConsole) aiConsole.textContent = "[v17.1 ENGINE INITIALIZED]";
 }
 
 function isRealUsbReady() {
@@ -157,7 +159,8 @@ function build16ByteFelRequest(cmd, addr, len) {
   return new Uint8Array(buf);
 }
 
-async function rawOut(bytes, timeoutMs = 2000) {
+// زيادة المهلة الافتراضية إلى 5000ms لمنع Timeout
+async function rawOut(bytes, timeoutMs = 5000) {
   if (!isRealUsbReady()) throw new Error("USB Disconnected");
   return await Promise.race([
     connectedOtgDevice.transferOut(otgEndpointOut, bytes),
@@ -165,7 +168,7 @@ async function rawOut(bytes, timeoutMs = 2000) {
   ]);
 }
 
-async function rawIn(len, timeoutMs = 1000) {
+async function rawIn(len, timeoutMs = 5000) {
   if (!isRealUsbReady()) throw new Error("USB Disconnected");
   const res = await Promise.race([
     connectedOtgDevice.transferIn(otgEndpointIn, len),
@@ -174,41 +177,42 @@ async function rawIn(len, timeoutMs = 1000) {
   return res.data;
 }
 
-async function sunxiUsbBulkWrite(payload, timeoutMs = 2000) {
+async function sunxiUsbBulkWrite(payload, timeoutMs = 5000) {
   await rawOut(build32ByteAwucWrapper(AW_USB_WRITE, payload.byteLength), timeoutMs);
   await rawOut(payload, timeoutMs);
-  try { await rawIn(13, 350); } catch (_) {}
+  try { await rawIn(13, 1000); } catch (_) {} // زيادة مهلة قراءة الحالة
 }
 
-async function sunxiUsbBulkRead(len, timeoutMs = 1000) {
+async function sunxiUsbBulkRead(len, timeoutMs = 5000) {
   await rawOut(build32ByteAwucWrapper(AW_USB_READ, len), timeoutMs);
   const d = await rawIn(len, timeoutMs).catch(() => null);
-  try { await rawIn(13, 350); } catch (_) {}
+  try { await rawIn(13, 1000); } catch (_) {}
   return d ? new Uint8Array(d.buffer) : new Uint8Array(0);
 }
 
-async function sunxiSendFelRequest(cmd, addr, len, timeoutMs = 1500) {
+async function sunxiSendFelRequest(cmd, addr, len, timeoutMs = 3000) {
   await sunxiUsbBulkWrite(build16ByteFelRequest(cmd, addr, len), timeoutMs);
 }
 
-async function sunxiReadFelStatus(timeoutMs = 600) {
+async function sunxiReadFelStatus(timeoutMs = 1500) {
   return await sunxiUsbBulkRead(8, timeoutMs).catch(() => new Uint8Array(8));
 }
 
-async function felWriteMemory(addr, bytes, timeoutMs = 2000) {
-  await sunxiSendFelRequest(0x0101, addr, bytes.byteLength, timeoutMs);
-  await sunxiUsbBulkWrite(bytes, timeoutMs);
-  await sunxiReadFelStatus(timeoutMs);
+// ==========================================
+// التعديل الجوهري: تجزئة البيانات إلى 512 بايت
+// ==========================================
+async function felWriteMemory(addr, bytes, timeoutMs = 5000) {
+  const CHUNK_SIZE = 512; 
+  for (let offset = 0; offset < bytes.byteLength; offset += CHUNK_SIZE) {
+    if (cancelFlashFlag) throw new Error("تم الإيقاف بواسطة المستخدم.");
+    const chunk = bytes.subarray(offset, Math.min(offset + CHUNK_SIZE, bytes.byteLength));
+    
+    await sunxiSendFelRequest(0x0101, addr + offset, chunk.byteLength, timeoutMs);
+    await sunxiUsbBulkWrite(chunk, timeoutMs);
+    await sunxiReadFelStatus(timeoutMs);
+  }
 }
 
-async function felReadMemory(addr, len, timeoutMs = 1200) {
-  await sunxiSendFelRequest(0x0103, addr, len, timeoutMs);
-  const data = await sunxiUsbBulkRead(len, timeoutMs);
-  await sunxiReadFelStatus(timeoutMs);
-  return data;
-}
-
-// استخراج fes1.fex و u-boot من روم 1.4GB أو ملفات U-Boot
 async function parseRomOrBinFile(file) {
   const buf = await file.slice(0, file.size).arrayBuffer();
   const rawBytes = new Uint8Array(buf);
@@ -218,7 +222,6 @@ async function parseRomOrBinFile(file) {
   let ubootBytes = null;
 
   if (file.size > 10 * 1024 * 1024) {
-    // بحث عن eGON.BT0 (fes1)
     for (let i = 0; i < Math.min(rawBytes.byteLength - 64, 48 * 1024 * 1024); i += 4) {
       if (
         rawBytes[i+4] === 0x65 && rawBytes[i+5] === 0x47 &&
@@ -233,7 +236,6 @@ async function parseRomOrBinFile(file) {
         }
       }
     }
-    // بحث عن U-Boot
     for (let i = 0; i < rawBytes.byteLength - 64; i += 4) {
       if (
         rawBytes[i] === 0x51 && rawBytes[i+1] === 0x23 && rawBytes[i+2] === 0x56 && rawBytes[i+3] === 0x78 ||
@@ -250,7 +252,6 @@ async function parseRomOrBinFile(file) {
       ubootBytes = rawBytes.subarray(32 * 1024 * 1024, Math.min(32 * 1024 * 1024 + 450560, rawBytes.byteLength));
     }
   } else {
-    // ملف u-boot-sunxi-with-spl.bin
     fes1Bytes = rawBytes.subarray(0, 24576);
     ubootBytes = rawBytes.subarray(32768, rawBytes.byteLength);
   }
@@ -261,35 +262,22 @@ async function parseRomOrBinFile(file) {
 function initV17UI() {
   const html = `
     <div style="background:linear-gradient(145deg, #090d16, #0f172a); padding:16px; border-radius:14px; margin:10px 0; border:2px solid #10b981; box-shadow:0 8px 30px rgba(16,185,129,0.25);">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <h3 style="color:#10b981; margin:0; font-size:16px;">🔥 المحرك الجراحي النهائي (v17.0 — Native FES1 DRAM Unlocker)</h3>
-        <span style="background:#10b981; color:#052e16; font-size:11px; font-weight:bold; padding:3px 8px; border-radius:20px;">v17.0 FINAL</span>
-      </div>
-      <p style="color:#cbd5e1; font-size:12px; margin:0 0 10px 0;">
-        💡 يرفع ملف <code>fes1.fex</code> الأصلي لفتح رامات LPDDR3 عتادياً في العنوان <code>0x00000000</code>، ثم يرفع نواة <code>U-Boot</code> مباشرة إلى العنوان <code>0x4A000000</code> لتعمل الذاكرة بنجاح تام!
-      </p>
-
+      <h3 style="color:#10b981; margin:0 0 6px 0; font-size:16px;">🔥 المحرك الجراحي النهائي (v17.1 — Fixed Chunking)</h3>
       <div style="margin:8px 0;">
         <label style="color:#38bdf8; font-weight:bold; font-size:12px;">📦 اختر ملف الروم الكامل (1.4GB) أو ملف u-boot-sunxi-with-spl.bin:</label>
         <input type="file" id="slot-file-spl" onchange="handleSlotFileSelect('spl', this)" style="width:100%; background:#1e293b; color:#fff; padding:8px; border-radius:8px; border:1px solid #10b981; margin-top:4px;">
       </div>
-
       <div id="slot-summary-badge" style="background:#1e293b; color:#10b981; font-size:12px; padding:8px; border-radius:8px; margin:8px 0; display:none;"></div>
-
-      <pre id="ai-brain-console" style="background:#050811; color:#34d399; font-size:11px; padding:10px; border-radius:8px; border:1px solid #065f46; max-height:140px; overflow-y:auto; margin:8px 0; font-family:monospace; white-space:pre-wrap;">[v17.0 Ready] اختر الملف واضغط زر التشغيل لفتح الرام ورفع U-Boot...</pre>
-
+      <pre id="ai-brain-console" style="background:#050811; color:#34d399; font-size:11px; padding:10px; border-radius:8px; border:1px solid #065f46; max-height:140px; overflow-y:auto; margin:8px 0; font-family:monospace; white-space:pre-wrap;">[v17.1 Ready] اختر الملف للبدء...</pre>
       <div style="background:#1e293b; border-radius:10px; padding:10px; margin:10px 0; border:1px solid #334155;">
         <div id="v170-live-stats" style="color:#f8fafc; font-size:12px; margin-bottom:6px; font-family:monospace;">⏱ بانتظار التشغيل...</div>
         <div style="width:100%; background:#090d16; height:22px; border-radius:6px; overflow:hidden; border:1px solid #475569;">
           <div id="v170-live-bar" style="width:0%; height:100%; background:linear-gradient(90deg, #10b981, #0ea5e9); color:#fff; font-size:11px; font-weight:bold; text-align:center; line-height:22px;">0%</div>
         </div>
       </div>
-
-      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
-        <button onclick="runNativeFes1AndUbootStream()" style="flex:1; background:linear-gradient(135deg, #10b981, #059669); color:#fff; font-weight:bold; padding:12px; border:none; border-radius:8px; cursor:pointer; font-size:14px;">
-          🔥 1. تشغيل FES1 (فتح الرام) + رفع U-Boot إلى 0x4A000000
-        </button>
-      </div>
+      <button onclick="runNativeFes1AndUbootStream()" style="width:100%; background:linear-gradient(135deg, #10b981, #059669); color:#fff; font-weight:bold; padding:12px; border:none; border-radius:8px; cursor:pointer; font-size:14px;">
+        🔥 1. تشغيل FES1 (فتح الرام) + رفع U-Boot إلى 0x4A000000
+      </button>
     </div>
   `;
   const target = document.getElementById("tab-stage-1") || document.body;
@@ -313,12 +301,8 @@ async function handleSlotFileSelect(slotName, inputEl) {
   const badge = document.getElementById("slot-summary-badge");
   if (badge) {
     badge.style.display = "block";
-    badge.innerHTML =
-      `🎯 <strong>تم استخراج ملفات التمهيد بنجاح (v17.0):</strong><br>` +
-      `• FES1 / SPL = <strong>${fes1Bytes ? (fes1Bytes.byteLength / 1024).toFixed(1) + " KB" : "N/A"}</strong><br>` +
-      `• U-Boot = <strong>${ubootBytes ? (ubootBytes.byteLength / 1024).toFixed(1) + " KB" : "N/A"}</strong>`;
+    badge.innerHTML = `🎯 <strong>تم استخراج ملفات التمهيد (v17.1):</strong> FES1 = ${(fes1Bytes?.byteLength/1024).toFixed(1)} KB | U-Boot = ${(ubootBytes?.byteLength/1024).toFixed(1)} KB`;
   }
-  logAi(`📥 تم تجهيز الملفات بنجاح من "${file.name}".`);
 }
 
 async function runNativeFes1AndUbootStream() {
@@ -328,7 +312,7 @@ async function runNativeFes1AndUbootStream() {
       preparedPayloads.fes1 = parsed.fes1Bytes;
       preparedPayloads.uboot = parsed.ubootBytes;
     } else {
-      return alert("يرجى اختيار ملف الروم (1.4GB) أو ملف u-boot-sunxi-with-spl.bin أولاً!");
+      return alert("اختر الملف أولاً!");
     }
   }
   if (!isRealUsbReady()) {
@@ -339,55 +323,51 @@ async function runNativeFes1AndUbootStream() {
   try {
     const startMs = performance.now();
     await reclaimAndDrainUsb();
-    logAi("🔥 [v17.0] بدء عملية إيقاظ الرام ورفع U-Boot...");
+    logAi("🔥 [v17.1] بدء الإيقاظ ورفع U-Boot (بنظام التجزئة الآمن)...");
 
-    // 1. مصافحة المعالج
     await sunxiSendFelRequest(0x0001, 0, 0);
     await sunxiUsbBulkRead(32);
     await sunxiReadFelStatus();
-    logAi("✅ [1/3] تم الاتصال بالمعالج بنجاح.");
 
-    // 2. إرسال fes1.fex إلى العنوان 0x00000000 وتشغيله لفتح رامات LPDDR3 عتادياً
+    logAi(`⏳ جاري حقن FES1 في العنوان ${FES1_LOAD_ADDR.toString(16)}...`);
     const fes1 = preparedPayloads.fes1;
-    logAi(`📤 [2/3] رفع كود تهيئة الرام (fes1.fex / SPL) بحجم ${(fes1.byteLength/1024).toFixed(1)} KB إلى 0x00000000...`);
-    await felWriteMemory(0x00000000, fes1, 2500);
+    await felWriteMemory(FES1_LOAD_ADDR, fes1, 5000);
 
-    logAi("⚡ تشغيل كود تهيئة الرام (FEL_EXEC @ 0x00000000)...");
+    logAi(`🚀 تنفيذ FES1 لتهيئة DRAM...`);
     try {
-      await sunxiSendFelRequest(0x0102, 0x00000000, 0, 1500);
-      await sunxiReadFelStatus(800);
+      await sunxiSendFelRequest(0x0102, FES1_LOAD_ADDR, 0, 3000);
+      await sunxiReadFelStatus(2000);
     } catch (_) {}
 
-    // انتظار ثانية لضمان استقرار متحكم الـ DRAM
-    await new Promise((res) => setTimeout(res, 1000));
-    logAi("✅ تم تفعيل رامات LPDDR3 في عتاد الرسيفر بنجاح.");
+    await new Promise((res) => setTimeout(res, 1500)); // انتظار تهيئة الرام
 
-    // 3. رفع نواة U-Boot إلى العنوان الكلاسيكي المستقر 0x4A000000
+    logAi(`📤 بدء رفع U-Boot...`);
     const uboot = preparedPayloads.uboot;
     const total = uboot.byteLength;
     const targetAddr = 0x4a000000;
-    const CHUNK = 2048;
-    logAi(`📤 [3/3] بدء نقل نواة U-Boot (${(total / 1024).toFixed(1)} KB) إلى ذاكرة DRAM في 0x4A000000...`);
+    
+    // بما أن felWriteMemory تقوم بالتجزئة الداخلية، نمرر كتل أكبر (مثلاً 4KB) لتحسين الأداء
+    const MAIN_CHUNK = 4096; 
 
     let uOffset = 0;
     while (uOffset < total) {
       if (cancelFlashFlag) throw new Error("تم الإيقاف.");
-      const end = Math.min(uOffset + CHUNK, total);
+      const end = Math.min(uOffset + MAIN_CHUNK, total);
       const slice = uboot.subarray(uOffset, end);
-      const currAddr = targetAddr + uOffset;
-
-      await felWriteMemory(currAddr, slice, 2000);
+      
+      await felWriteMemory(targetAddr + uOffset, slice, 5000);
+      
       uOffset = end;
-      updateLiveProgress("رفع U-Boot في الـ DRAM", uOffset, total, startMs);
+      updateLiveProgress("رفع U-Boot", uOffset, total, startMs);
     }
 
-    logAi("🚀 إرسال أمر الإقلاع النهائي لنواة U-Boot (FEL_EXEC @ 0x4A000000)...");
+    logAi(`✅ اكتمل رفع U-Boot. جاري التنفيذ...`);
     try {
-      await sunxiSendFelRequest(0x0102, targetAddr, 0, 1000);
-      await sunxiReadFelStatus(600);
+      await sunxiSendFelRequest(0x0102, targetAddr, 0, 3000);
+      await sunxiReadFelStatus(2000);
     } catch (_) {}
 
-    logAi("🎉 مبروك! تم إيقاف الجهاز، فتح الرام، وتشغيل U-Boot بنجاح تام! راقب شاشة التلفزيون.");
+    logAi("🎉 تم إيقاف الجهاز وتشغيل U-Boot بنجاح!");
   } catch (err) {
     logAi(`❌ خطأ: ${err.message}`);
   }

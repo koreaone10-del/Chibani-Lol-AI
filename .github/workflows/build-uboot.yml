@@ -1,70 +1,101 @@
-name: Build R69 LPDDR3 U-Boot
+name: Build R69-EMCP v2.0 Official LPDDR3 U-Boot + Fastboot
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
-      - master
+    paths:
+      - '.github/workflows/build-uboot.yml'
 
 jobs:
-  build:
+  build-uboot:
     runs-on: ubuntu-22.04
 
     steps:
-    - name: 1. Checkout Code
-      uses: actions/checkout@v3
+      - name: 1. Install ARM Cross-Compiler & Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git build-essential gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
+            libc6-dev bison flex bc device-tree-compiler libssl-dev python3 python-is-python3
+          sudo ln -sf /usr/bin/python3 /usr/bin/python2
 
-    - name: 2. Install Dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y git build-essential gcc-arm-linux-gnueabihf bison flex bc device-tree-compiler libssl-dev python3 python-is-python3
+      - name: 2. Clone U-Boot v2019.01
+        run: |
+          git clone --depth 1 -b v2019.01 https://github.com/u-boot/u-boot.git u-boot-r69
+          cd u-boot-r69
+          sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/' scripts/dtc/dtc-lexer.l* || true
+          # تحويل أي استدعاء لـ python2 في السكريبتات إلى python3 مباشرة
+          grep -rl "python2" tools/ scripts/ | xargs sed -i 's/python2/python3/g' || true
 
-    - name: 3. Clone U-Boot
-      run: |
-        git clone --depth 1 -b v2019.01 https://github.com/u-boot/u-boot.git u-boot-r69
-        cd u-boot-r69
-        grep -rl "python2" tools/ scripts/ | xargs sed -i 's/python2/python3/g' || true
+      - name: 3. Configure R69-EMCP v2.0 (LPDDR3 @ 336MHz + MUSB OTG + Fastboot)
+        run: |
+          cd u-boot-r69
+          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- orangepi_one_defconfig
 
-    - name: 4. Configure U-Boot for R69
-      run: |
-        cd u-boot-r69
-        make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- orangepi_one_defconfig
-        
-        # تعطيل الخصائص غير الضرورية
-        sed -i 's/CONFIG_PYLIBFDT=y/# CONFIG_PYLIBFDT is not set/' .config || true
-        sed -i 's/CONFIG_BINMAN=y/# CONFIG_BINMAN is not set/' .config || true
-        
-        # ضبط إعدادات الرامات الدقيقة (LPDDR3 @ 336MHz)
-        sed -i 's/CONFIG_DRAM_CLK=.*/CONFIG_DRAM_CLK=336/' .config
-        sed -i 's/CONFIG_DRAM_ZQ=.*/CONFIG_DRAM_ZQ=3750393/' .config
-        sed -i 's/CONFIG_SUNXI_DRAM_DDR3=y/# CONFIG_SUNXI_DRAM_DDR3 is not set/' .config || true
-        echo "CONFIG_SUNXI_DRAM_LPDDR3_STOCK=y" >> .config
-        
-        # تطبيق التغييرات
-        make olddefconfig ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
-        
-        echo "=== التحقق من الإعدادات ==="
-        grep -E "DRAM_CLK|DRAM_ZQ|SUNXI_DRAM" .config
+          # 1. تعطيل pylibfdt و binman لمنع طلب مكتبات بايثون خارجية
+          sed -i 's/CONFIG_PYLIBFDT=y/# CONFIG_PYLIBFDT is not set/' .config || true
+          sed -i 's/CONFIG_BINMAN=y/# CONFIG_BINMAN is not set/' .config || true
 
-    - name: 5. Compile
-      run: |
-        cd u-boot-r69
-        make -j$(nproc) ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- \
-          NO_PYTHON=1 \
-          HOSTCC="gcc -O2 -idirafter /usr/include -idirafter /usr/include/x86_64-linux-gnu -fcommon" \
-          HOSTLDFLAGS="-fcommon" \
-          u-boot-dtb.bin spl/sunxi-spl.bin
-        
-        # دمج SPL و U-Boot
-        cp spl/sunxi-spl.bin u-boot-sunxi-with-spl.bin
-        dd if=u-boot-dtb.bin of=u-boot-sunxi-with-spl.bin bs=1024 seek=32 conv=notrunc
-        
-        echo "=== حجم الملف النهائي ==="
-        ls -lh u-boot-sunxi-with-spl.bin
+          # 2. ضبط رامات R69-EMCP v2.0 (LPDDR3 @ 336MHz, ZQ=0x003939f9 = 3750393)
+          sed -i 's/CONFIG_DRAM_CLK=.*/CONFIG_DRAM_CLK=336/' .config
+          sed -i 's/CONFIG_DRAM_ZQ=.*/CONFIG_DRAM_ZQ=3750393/' .config
+          sed -i 's/CONFIG_SUNXI_DRAM_DDR3=y/# CONFIG_SUNXI_DRAM_DDR3 is not set/' .config || true
+          echo "CONFIG_SUNXI_DRAM_LPDDR3=y" >> .config
+          echo "CONFIG_SUNXI_DRAM_H3_LPDDR3=y" >> .config
 
-    - name: 6. Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: R69-U-Boot-Final
-        path: u-boot-r69/u-boot-sunxi-with-spl.bin
+          # 3. تفعيل ذاكرة eMCP الداخلية (MMC Slot 2)
+          echo "CONFIG_MMC_SUNXI_SLOT_EXTRA=2" >> .config
+          echo "CONFIG_SUPPORT_EMMC_BOOT=y" >> .config
+
+          # 4. تفعيل تعريف الهاردوير الفيزيائي لـ Allwinner H3 USB OTG (MUSB Gadget)
+          echo "CONFIG_USB_MUSB_SUNXI=y" >> .config
+          echo "CONFIG_USB_MUSB_GADGET=y" >> .config
+          echo "CONFIG_USB_MUSB_PIO_ONLY=y" >> .config
+          echo "CONFIG_USB_GADGET=y" >> .config
+          echo "CONFIG_USB_GADGET_DUALSPEED=y" >> .config
+          echo "CONFIG_USB_GADGET_DOWNLOAD=y" >> .config
+          echo "CONFIG_USB_GADGET_VBUS_DRAW=2" >> .config
+          echo "CONFIG_G_DNL_MANUFACTURER=\"Allwinner\"" >> .config
+          echo "CONFIG_G_DNL_VENDOR_NUM=0x1f3a" >> .config
+          echo "CONFIG_G_DNL_PRODUCT_NUM=0x1010" >> .config
+
+          # 5. تفعيل بروتوكول Fastboot للتفليش عبر OTG
+          echo "CONFIG_USB_FUNCTION_FASTBOOT=y" >> .config
+          echo "CONFIG_FASTBOOT=y" >> .config
+          echo "CONFIG_FASTBOOT_FLASH=y" >> .config
+          echo "CONFIG_FASTBOOT_FLASH_MMC=y" >> .config
+          echo "CONFIG_FASTBOOT_FLASH_MMC_DEV=1" >> .config
+          echo "CONFIG_FASTBOOT_BUF_ADDR=0x42000000" >> .config
+          echo "CONFIG_FASTBOOT_BUF_SIZE=0x10000000" >> .config
+          echo "CONFIG_CMD_FASTBOOT=y" >> .config
+          echo "CONFIG_CMD_MMC=y" >> .config
+          echo "CONFIG_CMD_PART=y" >> .config
+          echo "CONFIG_CMD_GPT=y" >> .config
+
+      - name: 4. Compile SPL & U-Boot (Direct Targets Without Binman)
+        run: |
+          cd u-boot-r69
+          make olddefconfig ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+
+          # بناء الأهداف الصريحة مباشرة لتجنب binman نهائياً
+          make -j$(nproc) \
+            ARCH=arm \
+            CROSS_COMPILE=arm-linux-gnueabihf- \
+            NO_PYTHON=1 \
+            HOSTCC="gcc -O2 -idirafter /usr/include -idirafter /usr/include/x86_64-linux-gnu -fcommon" \
+            HOSTLDFLAGS="-fcommon" \
+            u-boot-dtb.bin u-boot.bin spl/sunxi-spl.bin
+
+          # دمج SPL (في أول 32KB) + U-Boot (ابتداءً من 32KB) بأمر dd المضمون 100%
+          cp spl/sunxi-spl.bin u-boot-sunxi-with-spl.bin
+          dd if=u-boot-dtb.bin of=u-boot-sunxi-with-spl.bin bs=1024 seek=32 conv=notrunc
+          ls -lh u-boot-sunxi-with-spl.bin spl/sunxi-spl.bin u-boot-dtb.bin
+
+      - name: 5. Upload R69 LPDDR3 Fastboot Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: R69-EMCP-v2-LPDDR3-Fastboot-Package
+          path: |
+            u-boot-r69/u-boot-sunxi-with-spl.bin
+            u-boot-r69/spl/sunxi-spl.bin
+            u-boot-r69/u-boot-dtb.bin

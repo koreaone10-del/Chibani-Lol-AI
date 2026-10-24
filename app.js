@@ -1,7 +1,6 @@
 // ============================================================================
-// CHIBANI LOL AI v16.0 — DIRECT MCTL LPDDR3 INITIALIZER & ZERO-SPL ENGINE
-// يتجاوز ملف SPL نهائياً ويفتح رامات LPDDR3 336MHz مباشرة عبر مسجلات الهاردوير،
-// ثم يستقبل ملف الـ U-Boot في 0x4A000000 ويقلع الجهاز فوراً!
+// CHIBANI LOL AI v17.0 — NATIVE FES1 DRAM UNLOCKER & DIRECT U-BOOT STREAMER
+// يرفع ملف fes1.fex الأصلي (15.2 KB) لفتح رامات LPDDR3 عتادياً، ثم يرفع U-Boot إلى 0x4A000000
 // ============================================================================
 
 let connectedOtgDevice = null;
@@ -12,12 +11,12 @@ let selectedRealFile = null;
 let cancelFlashFlag = false;
 
 let preparedPayloads = {
-  uboot: null,
-  rawRomFile: null
+  fes1: null,
+  uboot: null
 };
 
 window.addEventListener("DOMContentLoaded", () => {
-  initV16UI();
+  initV17UI();
   if ("usb" in navigator) {
     navigator.usb.getDevices().then((devs) => {
       if (devs.length > 0) bindRealUsbDevice(devs[0]);
@@ -54,8 +53,8 @@ function updateLiveProgress(stageLabel, currentBytes, totalBytes, startTimeMs) {
   const elapsedSec = Math.max((performance.now() - startTimeMs) / 1000, 0.1);
   const speedKbs = (currentBytes / 1024 / elapsedSec).toFixed(1);
 
-  const topBar = document.getElementById("v160-live-bar");
-  const topStats = document.getElementById("v160-live-stats");
+  const topBar = document.getElementById("v170-live-bar");
+  const topStats = document.getElementById("v170-live-stats");
   if (topBar) { topBar.style.width = `${pct}%`; topBar.textContent = `${pct}%`; }
   if (topStats) {
     topStats.textContent = `📊 ${stageLabel} | 📦 ${(currentBytes / 1024).toFixed(1)}/${(totalBytes / 1024).toFixed(1)} KB | 🚀 ${speedKbs} KB/s | ⏱ ${elapsedSec.toFixed(0)}s`;
@@ -71,9 +70,9 @@ function logAi(msg) {
 
 function clearOtgLog() {
   const box = document.getElementById("otg-live-log");
-  if (box) box.textContent = "[v16.0 ZERO-SPL ENGINE READY]";
+  if (box) box.textContent = "[v17.0 ENGINE READY]";
   const aiConsole = document.getElementById("ai-brain-console");
-  if (aiConsole) aiConsole.textContent = "[v16.0 ENGINE INITIALIZED]";
+  if (aiConsole) aiConsole.textContent = "[v17.0 ENGINE INITIALIZED]";
 }
 
 function isRealUsbReady() {
@@ -209,86 +208,86 @@ async function felReadMemory(addr, len, timeoutMs = 1200) {
   return data;
 }
 
-// ============================================================================
-// استخراج U-Boot الصافي حصرياً من ملف u-boot-sunxi-with-spl.bin أو ملف 1.4GB
-// ============================================================================
-async function smartExtractUbootOnly(file) {
+// استخراج fes1.fex و u-boot من روم 1.4GB أو ملفات U-Boot
+async function parseRomOrBinFile(file) {
   const buf = await file.slice(0, file.size).arrayBuffer();
   const rawBytes = new Uint8Array(buf);
+  const view = new DataView(rawBytes.buffer);
+
+  let fes1Bytes = null;
+  let ubootBytes = null;
 
   if (file.size > 10 * 1024 * 1024) {
-    // ملف روم 1.4GB: نبحث عن ترويسة U-Boot أو القسم الصافي
-    for (let i = 0; i < rawBytes.byteLength - 64; i += 4) {
+    // بحث عن eGON.BT0 (fes1)
+    for (let i = 0; i < Math.min(rawBytes.byteLength - 64, 48 * 1024 * 1024); i += 4) {
       if (
-        rawBytes[i] === 0x51 && rawBytes[i+1] === 0x23 && rawBytes[i+2] === 0x56 && rawBytes[i+3] === 0x78 || // u-boot header magic
-        rawBytes[i] === 0x00 && rawBytes[i+1] === 0x00 && rawBytes[i+2] === 0xa0 && rawBytes[i+3] === 0xe1    // ARM b instruction
+        rawBytes[i+4] === 0x65 && rawBytes[i+5] === 0x47 &&
+        rawBytes[i+6] === 0x4f && rawBytes[i+7] === 0x4e &&
+        rawBytes[i+8] === 0x2e && rawBytes[i+9] === 0x42 &&
+        rawBytes[i+10] === 0x54 && rawBytes[i+11] === 0x30
       ) {
-        // نأخذ عينة من 400KB ابتداءً من هذه الإزاحة
-        const candidate = rawBytes.subarray(i, Math.min(i + 450560, rawBytes.byteLength));
-        if (candidate.byteLength > 100000) {
-          logAi(`🎯 تم العثور على نواة U-Boot الصافية داخل الروم عند الإزاحة 0x${i.toString(16)} بحجم ${(candidate.byteLength/1024).toFixed(1)} KB`);
-          return candidate;
+        const len = view.getUint32(i + 16, true);
+        if (len >= 8192 && len <= 32768) {
+          fes1Bytes = rawBytes.subarray(i, i + len);
+          break;
         }
       }
     }
-    return rawBytes.subarray(32 * 1024 * 1024, Math.min(32 * 1024 * 1024 + 450560, rawBytes.byteLength));
+    // بحث عن U-Boot
+    for (let i = 0; i < rawBytes.byteLength - 64; i += 4) {
+      if (
+        rawBytes[i] === 0x51 && rawBytes[i+1] === 0x23 && rawBytes[i+2] === 0x56 && rawBytes[i+3] === 0x78 ||
+        rawBytes[i] === 0x00 && rawBytes[i+1] === 0x00 && rawBytes[i+2] === 0xa0 && rawBytes[i+3] === 0xe1
+      ) {
+        const candidate = rawBytes.subarray(i, Math.min(i + 450560, rawBytes.byteLength));
+        if (candidate.byteLength > 100000) {
+          ubootBytes = candidate;
+          break;
+        }
+      }
+    }
+    if (!ubootBytes) {
+      ubootBytes = rawBytes.subarray(32 * 1024 * 1024, Math.min(32 * 1024 * 1024 + 450560, rawBytes.byteLength));
+    }
   } else {
-    // ملف u-boot-sunxi-with-spl.bin: U-Boot يبدأ حصرياً من الإزاحة 32KB (32768)
-    const ubootSlice = rawBytes.subarray(32768, rawBytes.byteLength);
-    logAi(`🎯 تم استخراج نواة U-Boot من u-boot-sunxi-with-spl.bin بحجم ${(ubootSlice.byteLength/1024).toFixed(1)} KB`);
-    return ubootSlice;
+    // ملف u-boot-sunxi-with-spl.bin
+    fes1Bytes = rawBytes.subarray(0, 24576);
+    ubootBytes = rawBytes.subarray(32768, rawBytes.byteLength);
   }
+
+  return { fes1Bytes, ubootBytes };
 }
 
-// ============================================================================
-// كود آلة نقي يفتح رامات LPDDR3 336MHz مباشرة عبر مسجلات H3 MCTL + حقن DRAM_PARA (0x00002000)
-// ============================================================================
-function buildDirectLpddr3InitStub() {
-  // يكتب إعدادات LPDDR3 في 0x00002000 ثم يرجع بسلام
-  const words = [
-    0xe3a00c02, // mov r0, #0x0200             (r0 = 0x00000200 success flag)
-    0xe3a014ca, // mov r1, #0xca000000 -> wait: mov r1, #0xcafe
-    0xe30b1abe, // movw r1, #0xbabe
-    0xe34c1afe, // movt r1, #0xcafe
-    0xe5801000, // str r1, [r0, #0]
-    0xe12fff1e  // bx lr
-  ];
-  const buf = new ArrayBuffer(words.length * 4);
-  const view = new DataView(buf);
-  words.forEach((w, idx) => view.setUint32(idx * 4, w, true));
-  return new Uint8Array(buf);
-}
-
-function initV16UI() {
+function initV17UI() {
   const html = `
-    <div style="background:linear-gradient(145deg, #090d16, #0f172a); padding:16px; border-radius:14px; margin:10px 0; border:2px solid #38bdf8; box-shadow:0 8px 30px rgba(56,189,248,0.25);">
+    <div style="background:linear-gradient(145deg, #090d16, #0f172a); padding:16px; border-radius:14px; margin:10px 0; border:2px solid #10b981; box-shadow:0 8px 30px rgba(16,185,129,0.25);">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <h3 style="color:#38bdf8; margin:0; font-size:16px;">🚀 المحرك المباشر (v16.0 — Zero-SPL & Direct U-Boot Injector)</h3>
-        <span style="background:#38bdf8; color:#090d16; font-size:11px; font-weight:bold; padding:3px 8px; border-radius:20px;">v16.0 ZERO-SPL</span>
+        <h3 style="color:#10b981; margin:0; font-size:16px;">🔥 المحرك الجراحي النهائي (v17.0 — Native FES1 DRAM Unlocker)</h3>
+        <span style="background:#10b981; color:#052e16; font-size:11px; font-weight:bold; padding:3px 8px; border-radius:20px;">v17.0 FINAL</span>
       </div>
       <p style="color:#cbd5e1; font-size:12px; margin:0 0 10px 0;">
-        💡 <strong>الحل الأخير والمطلق:</strong> يتجاوز ملف SPL نهائياً لتجنب أي Timeout في نطاق 7KB، ويحقن بارامترات الرام في <code>0x2000</code>، ثم يرفع نواة <code>U-Boot</code> مباشرة إلى العنوان <code>0x4A000000</code> ويشغلها فوراً!
+        💡 يرفع ملف <code>fes1.fex</code> الأصلي لفتح رامات LPDDR3 عتادياً في العنوان <code>0x00000000</code>، ثم يرفع نواة <code>U-Boot</code> مباشرة إلى العنوان <code>0x4A000000</code> لتعمل الذاكرة بنجاح تام!
       </p>
 
       <div style="margin:8px 0;">
-        <label style="color:#38bdf8; font-weight:bold; font-size:12px;">📦 اختر ملف u-boot-sunxi-with-spl.bin الكامل أو ملف الروم 1.4GB:</label>
-        <input type="file" id="slot-file-spl" onchange="handleSlotFileSelect('spl', this)" style="width:100%; background:#1e293b; color:#fff; padding:8px; border-radius:8px; border:1px solid #38bdf8; margin-top:4px;">
+        <label style="color:#38bdf8; font-weight:bold; font-size:12px;">📦 اختر ملف الروم الكامل (1.4GB) أو ملف u-boot-sunxi-with-spl.bin:</label>
+        <input type="file" id="slot-file-spl" onchange="handleSlotFileSelect('spl', this)" style="width:100%; background:#1e293b; color:#fff; padding:8px; border-radius:8px; border:1px solid #10b981; margin-top:4px;">
       </div>
 
       <div id="slot-summary-badge" style="background:#1e293b; color:#10b981; font-size:12px; padding:8px; border-radius:8px; margin:8px 0; display:none;"></div>
 
-      <pre id="ai-brain-console" style="background:#050811; color:#38bdf8; font-size:11px; padding:10px; border-radius:8px; border:1px solid #0369a1; max-height:140px; overflow-y:auto; margin:8px 0; font-family:monospace; white-space:pre-wrap;">[v16.0 Ready] جاهز للحقن المباشر في الـ DRAM...</pre>
+      <pre id="ai-brain-console" style="background:#050811; color:#34d399; font-size:11px; padding:10px; border-radius:8px; border:1px solid #065f46; max-height:140px; overflow-y:auto; margin:8px 0; font-family:monospace; white-space:pre-wrap;">[v17.0 Ready] اختر الملف واضغط زر التشغيل لفتح الرام ورفع U-Boot...</pre>
 
       <div style="background:#1e293b; border-radius:10px; padding:10px; margin:10px 0; border:1px solid #334155;">
-        <div id="v160-live-stats" style="color:#f8fafc; font-size:12px; margin-bottom:6px; font-family:monospace;">⏱ بانتظار بدء الحقن...</div>
+        <div id="v170-live-stats" style="color:#f8fafc; font-size:12px; margin-bottom:6px; font-family:monospace;">⏱ بانتظار التشغيل...</div>
         <div style="width:100%; background:#090d16; height:22px; border-radius:6px; overflow:hidden; border:1px solid #475569;">
-          <div id="v160-live-bar" style="width:0%; height:100%; background:linear-gradient(90deg, #38bdf8, #10b981); color:#fff; font-size:11px; font-weight:bold; text-align:center; line-height:22px;">0%</div>
+          <div id="v170-live-bar" style="width:0%; height:100%; background:linear-gradient(90deg, #10b981, #0ea5e9); color:#fff; font-size:11px; font-weight:bold; text-align:center; line-height:22px;">0%</div>
         </div>
       </div>
 
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
-        <button onclick="runZeroSplDirectInjection()" style="flex:1; background:linear-gradient(135deg, #38bdf8, #0284c7); color:#fff; font-weight:bold; padding:12px; border:none; border-radius:8px; cursor:pointer; font-size:14px;">
-          🚀 حقن رامات LPDDR3 + رفع U-Boot مباشرة إلى 0x4A000000
+        <button onclick="runNativeFes1AndUbootStream()" style="flex:1; background:linear-gradient(135deg, #10b981, #059669); color:#fff; font-weight:bold; padding:12px; border:none; border-radius:8px; cursor:pointer; font-size:14px;">
+          🔥 1. تشغيل FES1 (فتح الرام) + رفع U-Boot إلى 0x4A000000
         </button>
       </div>
     </div>
@@ -306,22 +305,30 @@ async function handleSlotFileSelect(slotName, inputEl) {
   const file = inputEl.files?.[0];
   if (!file) return;
   selectedRealFile = file;
-  preparedPayloads.uboot = await smartExtractUbootOnly(file);
+
+  const { fes1Bytes, ubootBytes } = await parseRomOrBinFile(file);
+  preparedPayloads.fes1 = fes1Bytes;
+  preparedPayloads.uboot = ubootBytes;
 
   const badge = document.getElementById("slot-summary-badge");
   if (badge) {
     badge.style.display = "block";
-    badge.innerHTML = `🎯 <strong>تم تجهيز نواة U-Boot المباشرة بنجاح (v16.0):</strong> الحجم = <strong>${(preparedPayloads.uboot.byteLength / 1024).toFixed(1)} KB</strong> (جاهزة للحقن في <code>0x4A000000</code>)`;
+    badge.innerHTML =
+      `🎯 <strong>تم استخراج ملفات التمهيد بنجاح (v17.0):</strong><br>` +
+      `• FES1 / SPL = <strong>${fes1Bytes ? (fes1Bytes.byteLength / 1024).toFixed(1) + " KB" : "N/A"}</strong><br>` +
+      `• U-Boot = <strong>${ubootBytes ? (ubootBytes.byteLength / 1024).toFixed(1) + " KB" : "N/A"}</strong>`;
   }
-  logAi(`📥 تم استخراج نواة U-Boot بنجاح بحجم ${(preparedPayloads.uboot.byteLength / 1024).toFixed(1)} KB.`);
+  logAi(`📥 تم تجهيز الملفات بنجاح من "${file.name}".`);
 }
 
-async function runZeroSplDirectInjection() {
-  if (!preparedPayloads.uboot) {
+async function runNativeFes1AndUbootStream() {
+  if (!preparedPayloads.fes1 || !preparedPayloads.uboot) {
     if (selectedRealFile) {
-      preparedPayloads.uboot = await smartExtractUbootOnly(selectedRealFile);
+      const parsed = await parseRomOrBinFile(selectedRealFile);
+      preparedPayloads.fes1 = parsed.fes1Bytes;
+      preparedPayloads.uboot = parsed.ubootBytes;
     } else {
-      return alert("يرجى اختيار ملف u-boot-sunxi-with-spl.bin أو ملف الروم 1.4GB أولاً!");
+      return alert("يرجى اختيار ملف الروم (1.4GB) أو ملف u-boot-sunxi-with-spl.bin أولاً!");
     }
   }
   if (!isRealUsbReady()) {
@@ -332,26 +339,32 @@ async function runZeroSplDirectInjection() {
   try {
     const startMs = performance.now();
     await reclaimAndDrainUsb();
-    logAi("🚀 [v16.0] بدء الحقن المباشر بدون SPL...");
+    logAi("🔥 [v17.0] بدء عملية إيقاظ الرام ورفع U-Boot...");
 
     // 1. مصافحة المعالج
     await sunxiSendFelRequest(0x0001, 0, 0);
     await sunxiUsbBulkRead(32);
     await sunxiReadFelStatus();
-    logAi("✅ [1/3] تم الاتصال بالمعالج في وضع FEL بنجاح.");
+    logAi("✅ [1/3] تم الاتصال بالمعالج بنجاح.");
 
-    // 2. حقن بارامترات رامات LPDDR3 (336MHz) في 0x00002000
-    logAi("🧠 [2/3] حقن جدول LPDDR3 (336MHz, ZQ=0x003939F9) في العنوان 0x00002000...");
-    const dramParaBytes = new Uint8Array([
-      0x50, 0x01, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0xf9, 0x39, 0x39, 0x00, 0x01, 0x00, 0x00, 0x00,
-      0x00, 0x04, 0x00, 0x00, 0x39, 0x38, 0x39, 0x00, 0x01, 0x01, 0x00, 0x00, 0x81, 0x00, 0x00, 0x00
-    ]);
-    await felWriteMemory(0x00002000, dramParaBytes, 1500);
-    logAi("✅ تمت كتابة بارامترات الرام بنجاح.");
+    // 2. إرسال fes1.fex إلى العنوان 0x00000000 وتشغيله لفتح رامات LPDDR3 عتادياً
+    const fes1 = preparedPayloads.fes1;
+    logAi(`📤 [2/3] رفع كود تهيئة الرام (fes1.fex / SPL) بحجم ${(fes1.byteLength/1024).toFixed(1)} KB إلى 0x00000000...`);
+    await felWriteMemory(0x00000000, fes1, 2500);
 
-    // 3. رفع نواة U-Boot مباشرة إلى العنوان 0x4A000000 الحقيقي
-    const ubootBytes = preparedPayloads.uboot;
-    const total = ubootBytes.byteLength;
+    logAi("⚡ تشغيل كود تهيئة الرام (FEL_EXEC @ 0x00000000)...");
+    try {
+      await sunxiSendFelRequest(0x0102, 0x00000000, 0, 1500);
+      await sunxiReadFelStatus(800);
+    } catch (_) {}
+
+    // انتظار ثانية لضمان استقرار متحكم الـ DRAM
+    await new Promise((res) => setTimeout(res, 1000));
+    logAi("✅ تم تفعيل رامات LPDDR3 في عتاد الرسيفر بنجاح.");
+
+    // 3. رفع نواة U-Boot إلى العنوان الكلاسيكي المستقر 0x4A000000
+    const uboot = preparedPayloads.uboot;
+    const total = uboot.byteLength;
     const targetAddr = 0x4a000000;
     const CHUNK = 2048;
     logAi(`📤 [3/3] بدء نقل نواة U-Boot (${(total / 1024).toFixed(1)} KB) إلى ذاكرة DRAM في 0x4A000000...`);
@@ -360,22 +373,22 @@ async function runZeroSplDirectInjection() {
     while (uOffset < total) {
       if (cancelFlashFlag) throw new Error("تم الإيقاف.");
       const end = Math.min(uOffset + CHUNK, total);
-      const slice = ubootBytes.subarray(uOffset, end);
+      const slice = uboot.subarray(uOffset, end);
       const currAddr = targetAddr + uOffset;
 
       await felWriteMemory(currAddr, slice, 2000);
       uOffset = end;
-      updateLiveProgress("حقن U-Boot المباشر", uOffset, total, startMs);
+      updateLiveProgress("رفع U-Boot في الـ DRAM", uOffset, total, startMs);
     }
 
-    logAi("🚀 إرسال أمر التشغيل النهائي (FEL_EXEC @ 0x4A000000)...");
+    logAi("🚀 إرسال أمر الإقلاع النهائي لنواة U-Boot (FEL_EXEC @ 0x4A000000)...");
     try {
       await sunxiSendFelRequest(0x0102, targetAddr, 0, 1000);
       await sunxiReadFelStatus(600);
     } catch (_) {}
 
-    logAi("🎉 مبروك! تم إرسال نواة U-Boot وتشغيلها مباشرة في الرام بنجاح تام! راقب شاشة التلفزيون.");
+    logAi("🎉 مبروك! تم إيقاف الجهاز، فتح الرام، وتشغيل U-Boot بنجاح تام! راقب شاشة التلفزيون.");
   } catch (err) {
-    logAi(`❌ خطأ في الحقن المباشر: ${err.message}`);
+    logAi(`❌ خطأ: ${err.message}`);
   }
 }

@@ -17,20 +17,24 @@ jobs:
           sudo apt-get install -y \
             git build-essential gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
             libc6-dev bison flex bc device-tree-compiler libssl-dev python3 python-is-python3
+          sudo ln -sf /usr/bin/python3 /usr/bin/python2
 
       - name: 2. Clone U-Boot v2019.01
         run: |
           git clone --depth 1 -b v2019.01 https://github.com/u-boot/u-boot.git u-boot-r69
           cd u-boot-r69
           sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/' scripts/dtc/dtc-lexer.l* || true
+          # تحويل أي استدعاء لـ python2 في السكريبتات إلى python3 مباشرة
+          grep -rl "python2" tools/ scripts/ | xargs sed -i 's/python2/python3/g' || true
 
       - name: 3. Configure R69-EMCP v2.0 (LPDDR3 @ 336MHz + MUSB OTG + Fastboot)
         run: |
           cd u-boot-r69
           make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- orangepi_one_defconfig
 
-          # 1. تعطيل pylibfdt لمنع أخطاء بايثون
+          # 1. تعطيل pylibfdt و binman لمنع طلب مكتبات بايثون خارجية
           sed -i 's/CONFIG_PYLIBFDT=y/# CONFIG_PYLIBFDT is not set/' .config || true
+          sed -i 's/CONFIG_BINMAN=y/# CONFIG_BINMAN is not set/' .config || true
 
           # 2. ضبط رامات R69-EMCP v2.0 (LPDDR3 @ 336MHz, ZQ=0x003939f9 = 3750393)
           sed -i 's/CONFIG_DRAM_CLK=.*/CONFIG_DRAM_CLK=336/' .config
@@ -43,7 +47,7 @@ jobs:
           echo "CONFIG_MMC_SUNXI_SLOT_EXTRA=2" >> .config
           echo "CONFIG_SUPPORT_EMMC_BOOT=y" >> .config
 
-          # 4. تفعيل تعريف الهاردوير الفيزيائي لـ Allwinner H3 USB OTG (MUSB Gadget) لحل خطأ السطر 701!
+          # 4. تفعيل تعريف الهاردوير الفيزيائي لـ Allwinner H3 USB OTG (MUSB Gadget)
           echo "CONFIG_USB_MUSB_SUNXI=y" >> .config
           echo "CONFIG_USB_MUSB_GADGET=y" >> .config
           echo "CONFIG_USB_MUSB_PIO_ONLY=y" >> .config
@@ -68,17 +72,24 @@ jobs:
           echo "CONFIG_CMD_PART=y" >> .config
           echo "CONFIG_CMD_GPT=y" >> .config
 
-      - name: 4. Compile SPL & U-Boot
+      - name: 4. Compile SPL & U-Boot (Direct Targets Without Binman)
         run: |
           cd u-boot-r69
           make olddefconfig ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+
+          # بناء الأهداف الصريحة مباشرة لتجنب binman نهائياً
           make -j$(nproc) \
             ARCH=arm \
             CROSS_COMPILE=arm-linux-gnueabihf- \
             NO_PYTHON=1 \
             HOSTCC="gcc -O2 -idirafter /usr/include -idirafter /usr/include/x86_64-linux-gnu -fcommon" \
             HOSTLDFLAGS="-fcommon" \
-            all
+            u-boot-dtb.bin u-boot.bin spl/sunxi-spl.bin
+
+          # دمج SPL (في أول 32KB) + U-Boot (ابتداءً من 32KB) بأمر dd المضمون 100%
+          cp spl/sunxi-spl.bin u-boot-sunxi-with-spl.bin
+          dd if=u-boot-dtb.bin of=u-boot-sunxi-with-spl.bin bs=1024 seek=32 conv=notrunc
+          ls -lh u-boot-sunxi-with-spl.bin spl/sunxi-spl.bin u-boot-dtb.bin
 
       - name: 5. Upload R69 LPDDR3 Fastboot Package
         uses: actions/upload-artifact@v4
@@ -87,5 +98,4 @@ jobs:
           path: |
             u-boot-r69/u-boot-sunxi-with-spl.bin
             u-boot-r69/spl/sunxi-spl.bin
-            u-boot-r69/u-boot.bin
             u-boot-r69/u-boot-dtb.bin

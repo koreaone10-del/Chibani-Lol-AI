@@ -1,6 +1,14 @@
 // ============================================================================
-// CHIBANI LOL AI v17.1 — NATIVE FES1 DRAM UNLOCKER & DIRECT U-BOOT STREAMER
+// CHIBANI LOL AI v17.2 — CUSTOMIZABLE FES1 LOADER & U-BOOT STREAMER
 // ============================================================================
+
+// --- [منطقة التخصيص] ---
+// جرب تغيير عنوان تحميل FES1 هنا (0x20000 أو 0x10000 أو 0x40000)
+const FES1_LOAD_ADDR = 0x20000; 
+
+// جرب تغيير حجم الكتلة هنا (512، 1024، 2048)
+const CHUNK_SIZE = 1024; 
+// ------------------------
 
 let connectedOtgDevice = null;
 let otgEndpointIn = 2;
@@ -8,9 +16,6 @@ let otgEndpointOut = 1;
 let activeInterfaceNum = 0;
 let selectedRealFile = null;
 let cancelFlashFlag = false;
-
-// عنوان تحميل FES1: جرب 0x20000 أو 0x10000 إذا فشل 0x00000000
-const FES1_LOAD_ADDR = 0x00000000; 
 
 let preparedPayloads = {
   fes1: null,
@@ -72,9 +77,9 @@ function logAi(msg) {
 
 function clearOtgLog() {
   const box = document.getElementById("otg-live-log");
-  if (box) box.textContent = "[v17.1 ENGINE READY]";
+  if (box) box.textContent = "[v17.2 ENGINE READY]";
   const aiConsole = document.getElementById("ai-brain-console");
-  if (aiConsole) aiConsole.textContent = "[v17.1 ENGINE INITIALIZED]";
+  if (aiConsole) aiConsole.textContent = "[v17.2 ENGINE INITIALIZED]";
 }
 
 function isRealUsbReady() {
@@ -159,7 +164,6 @@ function build16ByteFelRequest(cmd, addr, len) {
   return new Uint8Array(buf);
 }
 
-// زيادة المهلة الافتراضية إلى 5000ms لمنع Timeout
 async function rawOut(bytes, timeoutMs = 5000) {
   if (!isRealUsbReady()) throw new Error("USB Disconnected");
   return await Promise.race([
@@ -180,7 +184,7 @@ async function rawIn(len, timeoutMs = 5000) {
 async function sunxiUsbBulkWrite(payload, timeoutMs = 5000) {
   await rawOut(build32ByteAwucWrapper(AW_USB_WRITE, payload.byteLength), timeoutMs);
   await rawOut(payload, timeoutMs);
-  try { await rawIn(13, 1000); } catch (_) {} // زيادة مهلة قراءة الحالة
+  try { await rawIn(13, 1000); } catch (_) {}
 }
 
 async function sunxiUsbBulkRead(len, timeoutMs = 5000) {
@@ -199,10 +203,9 @@ async function sunxiReadFelStatus(timeoutMs = 1500) {
 }
 
 // ==========================================
-// التعديل الجوهري: تجزئة البيانات إلى 512 بايت
+// التعديل الجوهري: استخدام متغير CHUNK_SIZE القابل للتغيير
 // ==========================================
 async function felWriteMemory(addr, bytes, timeoutMs = 5000) {
-  const CHUNK_SIZE = 512; 
   for (let offset = 0; offset < bytes.byteLength; offset += CHUNK_SIZE) {
     if (cancelFlashFlag) throw new Error("تم الإيقاف بواسطة المستخدم.");
     const chunk = bytes.subarray(offset, Math.min(offset + CHUNK_SIZE, bytes.byteLength));
@@ -262,13 +265,13 @@ async function parseRomOrBinFile(file) {
 function initV17UI() {
   const html = `
     <div style="background:linear-gradient(145deg, #090d16, #0f172a); padding:16px; border-radius:14px; margin:10px 0; border:2px solid #10b981; box-shadow:0 8px 30px rgba(16,185,129,0.25);">
-      <h3 style="color:#10b981; margin:0 0 6px 0; font-size:16px;">🔥 المحرك الجراحي النهائي (v17.1 — Fixed Chunking)</h3>
+      <h3 style="color:#10b981; margin:0 0 6px 0; font-size:16px;">🔥 المحرك الجراحي النهائي (v17.2 — Customizable)</h3>
       <div style="margin:8px 0;">
         <label style="color:#38bdf8; font-weight:bold; font-size:12px;">📦 اختر ملف الروم الكامل (1.4GB) أو ملف u-boot-sunxi-with-spl.bin:</label>
         <input type="file" id="slot-file-spl" onchange="handleSlotFileSelect('spl', this)" style="width:100%; background:#1e293b; color:#fff; padding:8px; border-radius:8px; border:1px solid #10b981; margin-top:4px;">
       </div>
       <div id="slot-summary-badge" style="background:#1e293b; color:#10b981; font-size:12px; padding:8px; border-radius:8px; margin:8px 0; display:none;"></div>
-      <pre id="ai-brain-console" style="background:#050811; color:#34d399; font-size:11px; padding:10px; border-radius:8px; border:1px solid #065f46; max-height:140px; overflow-y:auto; margin:8px 0; font-family:monospace; white-space:pre-wrap;">[v17.1 Ready] اختر الملف للبدء...</pre>
+      <pre id="ai-brain-console" style="background:#050811; color:#34d399; font-size:11px; padding:10px; border-radius:8px; border:1px solid #065f46; max-height:140px; overflow-y:auto; margin:8px 0; font-family:monospace; white-space:pre-wrap;">[v17.2 Ready] اختر الملف للبدء...</pre>
       <div style="background:#1e293b; border-radius:10px; padding:10px; margin:10px 0; border:1px solid #334155;">
         <div id="v170-live-stats" style="color:#f8fafc; font-size:12px; margin-bottom:6px; font-family:monospace;">⏱ بانتظار التشغيل...</div>
         <div style="width:100%; background:#090d16; height:22px; border-radius:6px; overflow:hidden; border:1px solid #475569;">
@@ -301,7 +304,7 @@ async function handleSlotFileSelect(slotName, inputEl) {
   const badge = document.getElementById("slot-summary-badge");
   if (badge) {
     badge.style.display = "block";
-    badge.innerHTML = `🎯 <strong>تم استخراج ملفات التمهيد (v17.1):</strong> FES1 = ${(fes1Bytes?.byteLength/1024).toFixed(1)} KB | U-Boot = ${(ubootBytes?.byteLength/1024).toFixed(1)} KB`;
+    badge.innerHTML = `🎯 <strong>تم استخراج ملفات التمهيد (v17.2):</strong> FES1 = ${(fes1Bytes?.byteLength/1024).toFixed(1)} KB | U-Boot = ${(ubootBytes?.byteLength/1024).toFixed(1)} KB`;
   }
 }
 
@@ -323,7 +326,7 @@ async function runNativeFes1AndUbootStream() {
   try {
     const startMs = performance.now();
     await reclaimAndDrainUsb();
-    logAi("🔥 [v17.1] بدء الإيقاظ ورفع U-Boot (بنظام التجزئة الآمن)...");
+    logAi(`🔥 [v17.2] بدء الإيقاظ... (FES1 @ ${FES1_LOAD_ADDR.toString(16)}, Chunk: ${CHUNK_SIZE})`);
 
     await sunxiSendFelRequest(0x0001, 0, 0);
     await sunxiUsbBulkRead(32);
@@ -339,20 +342,17 @@ async function runNativeFes1AndUbootStream() {
       await sunxiReadFelStatus(2000);
     } catch (_) {}
 
-    await new Promise((res) => setTimeout(res, 1500)); // انتظار تهيئة الرام
+    await new Promise((res) => setTimeout(res, 1500));
 
     logAi(`📤 بدء رفع U-Boot...`);
     const uboot = preparedPayloads.uboot;
     const total = uboot.byteLength;
     const targetAddr = 0x4a000000;
-    
-    // بما أن felWriteMemory تقوم بالتجزئة الداخلية، نمرر كتل أكبر (مثلاً 4KB) لتحسين الأداء
-    const MAIN_CHUNK = 4096; 
 
     let uOffset = 0;
     while (uOffset < total) {
       if (cancelFlashFlag) throw new Error("تم الإيقاف.");
-      const end = Math.min(uOffset + MAIN_CHUNK, total);
+      const end = Math.min(uOffset + CHUNK_SIZE, total);
       const slice = uboot.subarray(uOffset, end);
       
       await felWriteMemory(targetAddr + uOffset, slice, 5000);

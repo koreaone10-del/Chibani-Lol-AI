@@ -1,76 +1,94 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#080d18">
-  <meta name="description" content="ARTEMIS R69 — مختبر تشخيص آمن لأجهزة Allwinner H3 وملفات firmware.">
-  <title>ARTEMIS R69 | Recovery Intelligence</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./style.css">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080d18">
+<meta name="description" content="ARTEMIS R69 — Firmware forensics, Allwinner FEL USB diagnostics and guarded recovery planning.">
+<title>ARTEMIS R69 | Recovery Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
-  <header class="topbar">
-    <a class="brand" href="#"><span class="brand-mark">A</span><span><b>ARTEMIS</b><small>R69 RECOVERY INTELLIGENCE</small></span></a>
-    <div class="header-status"><i></i><span id="app-status">مختبر التشخيص جاهز</span></div>
-  </header>
+<div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+<header class="topbar">
+ <a class="brand" href="#"><span class="brand-mark">A</span><span><b>ARTEMIS</b><small>R69 RECOVERY INTELLIGENCE</small></span></a>
+ <div class="header-status"><i></i><span id="app-status">مختبر التشخيص جاهز</span></div>
+</header>
+<main class="shell">
+ <section class="hero">
+  <div class="hero-copy">
+   <div class="eyebrow"><span></span> ANDROID HARDWARE DIAGNOSTICS / ALLWINNER H3</div>
+   <h1>نفهم الجهاز أولاً.<br><em>ثم نقرر طريقة الاستعادة.</em></h1>
+   <p>منصة محلية لتحليل Firmware وفحص USB وبناء تقرير توافق قبل الاستعادة. لا تُرسل ملفاتك إلى خادم ولا تنفّذ كتابة غير متحققة على الجهاز.</p>
+   <div class="hero-tags"><span>LOCAL FORENSICS</span><span>WEBUSB DESCRIPTORS</span><span>GUARDED FLASH CENTER</span></div>
+  </div>
+  <div class="hero-orb"><div class="orb-core">H3</div><span class="orb-ring ring-1"></span><span class="orb-ring ring-2"></span><span class="orb-ring ring-3"></span><div class="orb-caption">DEVICE INTELLIGENCE</div></div>
+ </section>
 
-  <main class="shell">
-    <section class="hero">
-      <div class="hero-copy">
-        <div class="eyebrow"><span></span> ANDROID HARDWARE DIAGNOSTICS / H3 PLATFORM</div>
-        <h1>نفهم الجهاز أولاً.<br><em>ثم نقرر طريقة الاستعادة.</em></h1>
-        <p>بيئة تحليل محلية لملفات الروم وفحص تعريف USB، مصممة لتشخيص R69-EMCP دون إرسال أوامر كتابة غير مؤكدة إلى ذاكرة الجهاز.</p>
-        <div class="hero-tags"><span>READ-ONLY USB</span><span>FIRMWARE FORENSICS</span><span>TERMUX FRIENDLY</span></div>
-      </div>
-      <div class="hero-orb"><div class="orb-core">H3</div><span class="orb-ring ring-1"></span><span class="orb-ring ring-2"></span><span class="orb-ring ring-3"></span><div class="orb-caption">DEVICE INTELLIGENCE</div></div>
-    </section>
+ <section class="metric-grid">
+  <article class="metric"><span>USB DEVICE</span><strong id="usb-state">غير متصل</strong><small id="usb-id">VID:PID غير معروف</small></article>
+  <article class="metric"><span>FIRMWARE</span><strong id="fw-state">لم يُفحص</strong><small id="fw-size">اختر ملف IMG</small></article>
+  <article class="metric"><span>PLATFORM</span><strong>Allwinner H3</strong><small>هوية مستهدفة — ليست إثباتاً للوحة</small></article>
+  <article class="metric"><span>FLASH PERMISSION</span><strong class="amber">LOCKED</strong><small>لا كتابة قبل إثبات التوافق</small></article>
+ </section>
 
-    <section class="metric-grid">
-      <article class="metric"><span>USB DEVICE</span><strong id="usb-state">غير متصل</strong><small id="usb-id">بانتظار الإقران</small></article>
-      <article class="metric"><span>FIRMWARE</span><strong id="fw-state">لم يُفحص</strong><small id="fw-size">اختر ملف IMG</small></article>
-      <article class="metric"><span>PLATFORM</span><strong>Allwinner H3</strong><small>الهدف المعلن — يحتاج تحققاً</small></article>
-      <article class="metric"><span>OPERATION MODE</span><strong class="green">READ ONLY</strong><small>لا توجد كتابة أو تفليش</small></article>
-    </section>
+ <section class="work-grid">
+  <article class="panel firmware-panel">
+   <div class="panel-head"><div><span class="section-index">01 / FIRMWARE FORENSICS</span><h2>مختبر تحليل الروم</h2></div><span class="pill">LOCAL PROCESSING</span></div>
+   <p class="muted">يدعم ملفات IMG وBIN وFEX الكبيرة. القراءة تتم على دفعات، دون رفع الملف أو تعديله.</p>
+   <label class="dropzone" for="firmware-file" id="dropzone"><span class="upload-icon">⇧</span><b>اضغط لاختيار ملف الروم</b><small>IMG / BIN / FEX / ROM — المعالجة محلية</small><input id="firmware-file" type="file" accept=".img,.bin,.fex,.rom,application/octet-stream"></label>
+   <div class="progress-wrap"><div id="scan-progress"></div></div><div class="progress-meta"><span id="scan-status">لم يبدأ الفحص</span><span id="scan-percent">0%</span></div>
+   <div class="scan-summary" id="scan-summary"><div class="empty-state">نتائج التحليل ستظهر هنا.</div></div>
+   <div class="action-row"><button class="btn primary" id="scan-btn" disabled>بدء التحليل</button><button class="btn ghost" id="report-btn" disabled>تصدير تقرير JSON</button></div>
+  </article>
 
-    <section class="work-grid">
-      <article class="panel firmware-panel">
-        <div class="panel-head"><div><span class="section-index">01 / FORENSICS</span><h2>تحليل ملف Firmware</h2></div><span class="pill">LOCAL PROCESSING</span></div>
-        <p class="muted">اختر ملف الروم من الهاتف. تتم قراءته على دفعات صغيرة لتقليل استهلاك الذاكرة، ولا يُرفع إلى أي خادم.</p>
-        <label class="dropzone" for="firmware-file" id="dropzone">
-          <span class="upload-icon">⇧</span><b>اضغط لاختيار ملف IMG / BIN</b><small>التحليل محلي داخل المتصفح — لا يتم تعديل الملف</small>
-          <input id="firmware-file" type="file" accept=".img,.bin,.fex,.rom,application/octet-stream">
-        </label>
-        <div class="progress-wrap"><div id="scan-progress"></div></div>
-        <div class="progress-meta"><span id="scan-status">لم يبدأ الفحص</span><span id="scan-percent">0%</span></div>
-        <div class="scan-summary" id="scan-summary">
-          <div class="empty-state">نتائج تحليل الملف ستظهر هنا.</div>
-        </div>
-        <div class="action-row"><button class="btn primary" id="scan-btn" disabled>بدء التحليل</button><button class="btn ghost" id="report-btn" disabled>تصدير تقرير JSON</button></div>
-      </article>
+  <article class="panel usb-panel">
+   <div class="panel-head"><div><span class="section-index">02 / USB INTELLIGENCE</span><h2>اتصال OTG الحقيقي</h2></div><span class="pill safe">DESCRIPTOR INSPECTION</span></div>
+   <p class="muted">يفتح واجهة USB بعد اختيار الجهاز ويقرأ أوصاف الواجهات ونقاط Bulk فقط. لا يرسل أوامر FEL ولا يقرأ أو يكتب ذاكرة الجهاز.</p>
+   <div class="usb-visual"><div class="usb-symbol">⌁</div><div><b id="usb-device-name">لا يوجد جهاز مختار</b><small id="usb-device-detail">VID: — / PID: —</small></div></div>
+   <button class="btn primary full" id="pair-btn">إقران وفحص USB عبر OTG</button>
+   <button class="btn ghost full" id="forget-btn">فصل الجهاز</button>
+   <div id="usb-descriptors" class="descriptor-box">بانتظار اتصال USB...</div>
+   <div class="notice"><b>معلومة مهمة</b><p>VID 1F3A وPID EFE8 يتوافقان مع معرف FEL شائع في Allwinner، لكنهما لا يثبتان وحدهما هوية اللوحة أو توافق الروم.</p></div>
+   <div class="usb-capabilities"><span><i class="ok"></i> فحص أوصاف USB</span><span><i class="off"></i> قراءة RAM معطلة</span><span><i class="off"></i> كتابة / تنفيذ معطلان</span></div>
+  </article>
+ </section>
 
-      <article class="panel usb-panel">
-        <div class="panel-head"><div><span class="section-index">02 / USB INTELLIGENCE</span><h2>فحص اتصال OTG</h2></div><span class="pill safe">SAFE MODE</span></div>
-        <p class="muted">يطلب المتصفح إذن اختيار جهاز USB. تُقرأ بيانات التعريف فقط؛ لا يتم فتح واجهة نقل ولا إرسال أوامر FEL.</p>
-        <div class="usb-visual"><div class="usb-symbol">⌁</div><div><b id="usb-device-name">لا يوجد جهاز مختار</b><small id="usb-device-detail">VID: — &nbsp; PID: —</small></div></div>
-        <button class="btn primary full" id="pair-btn">إقران جهاز USB عبر OTG</button>
-        <button class="btn ghost full" id="forget-btn">مسح بيانات الجهاز من الواجهة</button>
-        <div class="notice"><b>معلومة مهمة</b><p>ظهور VID/PID لا يثبت أن الجهاز في وضع FEL، ولا يثبت سلامة المعالج أو ذاكرة eMCP. يلزم فحص مستقل قبل أي استعادة.</p></div>
-        <div class="usb-capabilities"><span><i class="ok"></i> قراءة بيانات التعريف</span><span><i class="off"></i> كتابة الذاكرة معطلة</span><span><i class="off"></i> تنفيذ Bootloader معطل</span></div>
-      </article>
-    </section>
+ <section class="panel ai-panel">
+  <div class="panel-head"><div><span class="section-index">03 / RECOVERY INTELLIGENCE</span><h2>محرك تحليل واستنتاج</h2></div><span class="pill">RULE-BASED / TRANSPARENT</span></div>
+  <p class="muted">يحوّل نتائج الفحص إلى استنتاجات قابلة للتدقيق. هذا المحرك المحلي لا يدّعي الاتصال بنموذج ذكاء اصطناعي سحابي ولا يخترع معلومات غير موجودة.</p>
+  <div class="ai-grid">
+   <div class="ai-card"><small>Firmware container</small><strong id="ai-container">غير محدد</strong></div>
+   <div class="ai-card"><small>Boot components</small><strong id="ai-boot">لم تُفحص</strong></div>
+   <div class="ai-card"><small>USB state</small><strong id="ai-usb">غير متصل</strong></div>
+   <div class="ai-card"><small>Compatibility verdict</small><strong id="ai-verdict" class="amber">غير محسوم</strong></div>
+  </div>
+  <div class="action-row"><button class="btn primary" id="diagnose-btn" disabled>إنشاء تقرير التشخيص</button><button class="btn ghost" id="copy-btn">نسخ ملخص التشخيص</button></div>
+  <pre id="ai-report" class="report-box">اختر الروم وافحص USB أولاً، ثم أنشئ تقرير التشخيص.</pre>
+ </section>
 
-    <section class="panel findings-panel">
-      <div class="panel-head"><div><span class="section-index">03 / DIAGNOSTIC CONSOLE</span><h2>سجل التحليل</h2></div><button class="text-btn" id="clear-log">مسح السجل</button></div>
-      <div id="console" class="console" aria-live="polite"><div class="log-line"><time>READY</time><span>ARTEMIS R69 بدأ التشغيل. لا توجد عمليات على الجهاز.</span></div></div>
-    </section>
+ <section class="panel flash-panel">
+  <div class="panel-head"><div><span class="section-index">04 / FLASH CENTER</span><h2>مركز الاستعادة والفلاش</h2></div><span class="pill locked">HARD SAFETY LOCK</span></div>
+  <div class="flash-banner"><div class="lock-icon">▣</div><div><b>FLASH EXECUTION IS LOCKED</b><p>الواجهة جاهزة لتجهيز خطة الاستعادة، لكن الكتابة الدائمة غير مفعلة لأن توافق اللوحة وDRAM وeMMC لم يُثبت بعد.</p></div></div>
+  <div class="flash-grid">
+   <div class="flash-step"><span>01</span><b>Board identity</b><small id="check-board">غير مؤكد</small></div>
+   <div class="flash-step"><span>02</span><b>DRAM profile</b><small id="check-dram">غير مؤكد</small></div>
+   <div class="flash-step"><span>03</span><b>Boot0 / SPL match</b><small id="check-boot">غير مؤكد</small></div>
+   <div class="flash-step"><span>04</span><b>eMMC geometry</b><small id="check-emmc">غير مؤكد</small></div>
+   <div class="flash-step"><span>05</span><b>Partition map</b><small id="check-partition">غير مؤكد</small></div>
+   <div class="flash-step"><span>06</span><b>Independent validation</b><small id="check-validation">غير مكتمل</small></div>
+  </div>
+  <div class="flash-controls"><button class="btn disabled" id="prepare-flash-btn" disabled>تجهيز الفلاش — غير متاح حالياً</button><span id="flash-lock-reason">لا توجد أدلة كافية للسماح بالكتابة إلى الذاكرة.</span></div>
+  <p class="fineprint">لا تستخدم ملفات Boot0 أو SPL أو عناوين ذاكرة مأخوذة من جهاز آخر. خطأ واحد في تهيئة DRAM أو تخطيط eMMC قد يمنع الإقلاع نهائياً.</p>
+ </section>
 
-    <section class="disclaimer"><span>ⓘ</span><p><b>حدود السلامة والدقة:</b> فحص التواقيع يحدد مواقع نصوص معروفة فقط، ولا يستخرج أقسام IMAGEWTY تلقائياً ولا يثبت توافق Boot0 أو SPL مع اللوحة. لا تستخدم ملف إقلاع أوامر كتابة/تنفيذ اعتماداً على تطابق توقيع وحده.</p></section>
-  </main>
-  <footer>ARTEMIS R69 <span>•</span> DIAGNOSTIC BUILD 3.0 <span>•</span> LOCAL-FIRST / READ-ONLY</footer>
-  <script src="./app.js"></script>
-</body>
-</html>
+ <section class="panel findings-panel">
+  <div class="panel-head"><div><span class="section-index">05 / EVENT LOG</span><h2>سجل العمليات</h2></div><button class="text-btn" id="clear-log">مسح السجل</button></div>
+  <div id="console" class="console" aria-live="polite"><div class="log-line"><time>READY</time><span>ARTEMIS R69 بدأ التشغيل. لا توجد عمليات على الجهاز.</span></div></div>
+ </section>
+ <section class="disclaimer"><span>ⓘ</span><p><b>حدود الدقة:</b> التواقيع لا تثبت حدود الأقسام أو توافق الملفات. فحص أوصاف USB لا يساوي مصافحة FEL. لا يمكن للمتصفح استنتاج نوع DRAM أو خريطة eMMC دون بيانات موثوقة من الجهاز واللوحة.</p></section>
+</main>
+<footer>ARTEMIS R69 <span>•</span> COMPLETE DIAGNOSTIC BUILD 4.0 <span>•</span> LOCAL-FIRST / GUARDED RECOVERY</footer>
+<script src="./app.js"></script>
+</body></html>

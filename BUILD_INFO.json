@@ -1,0 +1,15 @@
+{
+  "name": "ARTEMIS R69 Complete Diagnostic Build",
+  "version": "4.0.0",
+  "build_type": "static_site",
+  "entry": "index.html",
+  "safety_mode": "read_only_usb_descriptor_inspection",
+  "flash_execution": "disabled_pending_hardware_compatibility_validation",
+  "files": [
+    "index.html",
+    "style.css",
+    "app.js",
+    "README.md",
+    "BUILD_INFO.json"
+  ]
+}

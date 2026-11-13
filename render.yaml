@@ -1,8 +1,8 @@
 services:
   - type: web
-    name: chibani-lol-ai
-    env: static
-    buildCommand: echo "Building CHIBANI LOL AI Static Platform..."
+    name: artemis-r69
+    runtime: static
+    buildCommand: ""
     staticPublishPath: .
     routes:
       - type: rewrite

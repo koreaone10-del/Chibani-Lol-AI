@@ -1,0 +1,22 @@
+تطبيق الحزمة من الهاتف فقط
+
+1) فك ضغط ARTEMIS_R69_COMPLETE.zip.
+2) افتح Termux ونفّذ:
+   termux-setup-storage
+   pkg update -y
+   pkg install git -y
+3) ادخل مجلد الحزمة (عدّل المسار إذا فككتها في مكان آخر):
+   cd ~/storage/downloads/ARTEMIS_R69_COMPLETE
+4) اربطها بمستودع GitHub الخاص بك:
+   git init
+   git branch -M main
+   git remote add origin https://github.com/USERNAME/REPOSITORY.git
+   git add .
+   git commit -m "Deploy ARTEMIS R69 complete diagnostic build"
+   git push -u origin main
+
+مهم:
+- استبدل USERNAME/REPOSITORY بمعلومات مستودعك.
+- عند طلب بيانات الدخول استعمل آلية GitHub المعتمدة/Token من Git Credential Prompt؛ لا تضع Token داخل الأوامر أو الملفات.
+- إذا ظهر أن remote موجود أو أن الفرع يحتوي تغييرات سابقة، لا تستعمل force push. أرسل رسالة الخطأ لمعالجتها.
+- بعد نجاح Push، افتح Render وانتظر نشر Static Site المرتبط بالمستودع.

@@ -1,32 +1,31 @@
-# ARTEMIS R69 — Hardware Compatibility Intelligence v5.0
+# ARTEMIS R69 v6 — Firmware Intelligence
 
-Complete static-site replacement for the R69 diagnostic workspace.
+Mobile-first local firmware inspection workspace for the Allwinner R69 investigation.
 
-## Included
-- Arabic RTL responsive interface.
-- Local chunked firmware signature scan (4 MiB chunks).
-- JSON diagnostic export.
-- WebUSB descriptor inspection for the selected USB device.
-- Hardware evidence register for PCB, DRAM, eMMC, partition-map and independent-review references.
-- Report clearly separates user-entered evidence from independently verified facts.
-- Persistent Flash Center lock; no FEL command, RAM access, code execution, erase, or eMMC write is implemented.
+## Features
+- Browser-local inspection of selected firmware files; file contents are not uploaded to the server.
+- Parses `sys_config.fex` DRAM key/value settings.
+- Parses `[partition]` sections in `sys_partition.fex`, treating each sector as 512 bytes as specified by the supplied format.
+- Scans binary files for known signatures and printable strings.
+- Optional WebUSB descriptor identification for VID `1F3A`, PID `EFE8`.
+- Flash Center is intentionally read-only.
+
+## Important limits
+- DRAM settings are firmware configuration, not a live physical RAM read.
+- A U-Boot string mentioning MMC/eMMC is not proof that the target storage was detected.
+- WebUSB device selection only reads USB descriptor fields. It does not issue FEL commands, dump RAM, erase, burn, or write.
+- Partition totals do not establish the actual eMMC capacity, especially when `UDISK` has no explicit size.
+- No automated bootloader writing is included. Confirming board revision, exact SoC, storage layout and image compatibility requires qualified hardware verification.
 
 ## Deploy on Render
-- Service type: Static Site
-- Build command: leave empty
-- Publish directory: `.`
-- Serve over HTTPS for WebUSB.
+Create a new Web Service from this repository:
+- Runtime: Node
+- Build command: `npm install`
+- Start command: `npm start`
 
-## Important limitations
-USB VID/PID and descriptor access do not prove a complete FEL handshake or identify the PCB. A firmware signature scan does not parse or validate every IMAGEWTY entry, checksum, partition offset, DRAM profile, or bootloader compatibility. Values entered in the hardware evidence register are not authenticated by the app. A qualified technician must independently verify the exact PCB revision and memory components using reliable board documentation.
+Or use the included `render.yaml`.
 
-Do not open or electrically modify the device as part of this software workflow. If physical markings are needed, have a qualified technician inspect the board and provide the documented values.
-
-## Files
-- `index.html`
-- `style.css`
-- `app.js`
-- `README.md`
-- `BUILD_INFO.json`
-
-No manual script insertion is required; `index.html` already loads `app.js`.
+## Run locally
+```bash
+npm start
+```

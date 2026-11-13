@@ -1,25 +1,12 @@
 {
-  "name": "ARTEMIS R69 Hardware Compatibility Intelligence",
-  "version": "5.0.0",
-  "build_type": "static_site",
-  "entry": "index.html",
-  "safety_mode": "read_only_usb_descriptor_inspection_and_local_firmware_scan",
-  "flash_execution": false,
-  "fel_commands": false,
-  "device_memory_read": false,
-  "device_memory_write": false,
+  "product": "ARTEMIS R69",
+  "version": "6.0.0",
+  "mode": "read-only",
   "features": [
-    "local_chunked_signature_scan",
-    "usb_descriptor_inspection",
-    "hardware_evidence_register",
-    "transparent_rule_based_compatibility_report",
-    "json_export"
+    "FEX DRAM parser",
+    "partition parser",
+    "binary signature scanner",
+    "WebUSB descriptor-only identification"
   ],
-  "files": [
-    "index.html",
-    "style.css",
-    "app.js",
-    "README.md",
-    "BUILD_INFO.json"
-  ]
+  "flash_write": false
 }

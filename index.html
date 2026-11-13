@@ -1,116 +1,59 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#080d18">
-<meta name="description" content="ARTEMIS R69 — Firmware forensics, Allwinner FEL USB diagnostics and guarded recovery planning.">
-<title>ARTEMIS R69 v5 | Hardware Compatibility Intelligence</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./style.css">
+<title>ARTEMIS R69 | Firmware Intelligence</title>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+<div class="shell">
 <header class="topbar">
- <a class="brand" href="#"><span class="brand-mark">A</span><span><b>ARTEMIS</b><small>R69 RECOVERY INTELLIGENCE</small></span></a>
- <div class="header-status"><i></i><span id="app-status">مختبر التشخيص جاهز</span></div>
+  <div class="brand"><div class="sigil">A</div><div><b>ARTEMIS <span>R69</span></b><small>FIRMWARE INTELLIGENCE SYSTEM · V6</small></div></div>
+  <div class="top-status"><i></i> وضع التحليل المحلي <strong>READ-ONLY</strong></div>
 </header>
-<main class="shell">
- <section class="hero">
-  <div class="hero-copy">
-   <div class="eyebrow"><span></span> ANDROID HARDWARE DIAGNOSTICS / ALLWINNER H3</div>
-   <h1>نفهم الجهاز أولاً.<br><em>ثم نقرر طريقة الاستعادة.</em></h1>
-   <p>منصة محلية لتحليل Firmware وفحص USB وبناء تقرير توافق قبل الاستعادة. لا تُرسل ملفاتك إلى خادم ولا تنفّذ كتابة غير متحققة على الجهاز.</p>
-   <div class="hero-tags"><span>LOCAL FORENSICS</span><span>WEBUSB DESCRIPTORS</span><span>GUARDED FLASH CENTER</span></div>
-  </div>
-  <div class="hero-orb"><div class="orb-core">H3</div><span class="orb-ring ring-1"></span><span class="orb-ring ring-2"></span><span class="orb-ring ring-3"></span><div class="orb-caption">DEVICE INTELLIGENCE</div></div>
- </section>
-
- <section class="metric-grid">
-  <article class="metric"><span>USB DEVICE</span><strong id="usb-state">غير متصل</strong><small id="usb-id">VID:PID غير معروف</small></article>
-  <article class="metric"><span>FIRMWARE</span><strong id="fw-state">لم يُفحص</strong><small id="fw-size">اختر ملف IMG</small></article>
-  <article class="metric"><span>PLATFORM</span><strong>Allwinner H3</strong><small>هوية مستهدفة — ليست إثباتاً للوحة</small></article>
-  <article class="metric"><span>FLASH PERMISSION</span><strong class="amber">LOCKED</strong><small>لا كتابة قبل إثبات التوافق</small></article>
- </section>
-
- <section class="work-grid">
-  <article class="panel firmware-panel">
-   <div class="panel-head"><div><span class="section-index">01 / FIRMWARE FORENSICS</span><h2>مختبر تحليل الروم</h2></div><span class="pill">LOCAL PROCESSING</span></div>
-   <p class="muted">يدعم ملفات IMG وBIN وFEX الكبيرة. القراءة تتم على دفعات، دون رفع الملف أو تعديله.</p>
-   <label class="dropzone" for="firmware-file" id="dropzone"><span class="upload-icon">⇧</span><b>اضغط لاختيار ملف الروم</b><small>IMG / BIN / FEX / ROM — المعالجة محلية</small><input id="firmware-file" type="file" accept=".img,.bin,.fex,.rom,application/octet-stream"></label>
-   <div class="progress-wrap"><div id="scan-progress"></div></div><div class="progress-meta"><span id="scan-status">لم يبدأ الفحص</span><span id="scan-percent">0%</span></div>
-   <div class="scan-summary" id="scan-summary"><div class="empty-state">نتائج التحليل ستظهر هنا.</div></div>
-   <div class="action-row"><button class="btn primary" id="scan-btn" disabled>بدء التحليل</button><button class="btn ghost" id="report-btn" disabled>تصدير تقرير JSON</button></div>
+<section class="hero">
+  <div class="eyebrow">ALLWINNER PLATFORM · DEVICE RECOVERY LAB</div>
+  <h1>مركز تحليل واستعادة<br><em>Firmware Intelligence</em></h1>
+  <p>تحليل ملفات الإقلاع والذاكرة والتقسيمات محلياً داخل المتصفح. لا يتم إرسال ملفاتك إلى خادم.</p>
+  <div class="hero-tags"><span>H3 / sun8iw7p1</span><span>LPDDR3 · 1 GB (reported)</span><span>eMMC · 8 GB (reported)</span></div>
+</section>
+<section class="grid metrics">
+  <article class="metric"><small>PLATFORM PROFILE</small><b>Allwinner H3</b><span>مستنتج من أدلة Firmware</span></article>
+  <article class="metric"><small>DRAM CONFIG</small><b>LPDDR3 · 336 MHz</b><span>sys_config.fex</span></article>
+  <article class="metric"><small>STORAGE PROFILE</small><b>8 GB eMMC*</b><span>*حسب مواصفاتك، غير مقروء مباشرة</span></article>
+  <article class="metric"><small>FLASH STATUS</small><b class="amber">LOCKED</b><span>لا توجد كتابة تلقائية</span></article>
+</section>
+<section class="panel">
+  <div class="panel-head"><div><span class="num">01</span><h2>Firmware File Inspector</h2><p>اختر ملفات Firmware أو ملفات FEX من الهاتف لتحليلها محلياً.</p></div><label class="upload-btn">＋ اختيار الملفات<input id="files" type="file" multiple hidden></label></div>
+  <div id="drop" class="drop"><div class="upload-icon">⇧</div><b>اسحب الملفات هنا أو اضغط للاختيار</b><small>IMG · FEX · BIN · DAT · TXT · ملفات Boot</small><div id="filelist" class="filelist">لم يتم اختيار ملفات بعد</div></div>
+  <div class="actions"><button id="analyze" class="primary" disabled>بدء التحليل</button><button id="clear" class="ghost">مسح النتائج</button></div>
+</section>
+<section class="grid two">
+  <article class="panel">
+    <div class="panel-head"><div><span class="num">02</span><h2>DRAM Analyzer</h2><p>تحليل إعدادات الذاكرة الموجودة في النصوص.</p></div></div>
+    <div id="dram" class="result empty">بانتظار sys_config.fex</div>
   </article>
-
-  <article class="panel usb-panel">
-   <div class="panel-head"><div><span class="section-index">02 / USB INTELLIGENCE</span><h2>اتصال OTG الحقيقي</h2></div><span class="pill safe">DESCRIPTOR INSPECTION</span></div>
-   <p class="muted">يفتح واجهة USB بعد اختيار الجهاز ويقرأ أوصاف الواجهات ونقاط Bulk فقط. لا يرسل أوامر FEL ولا يقرأ أو يكتب ذاكرة الجهاز.</p>
-   <div class="usb-visual"><div class="usb-symbol">⌁</div><div><b id="usb-device-name">لا يوجد جهاز مختار</b><small id="usb-device-detail">VID: — / PID: —</small></div></div>
-   <button class="btn primary full" id="pair-btn">إقران وفحص USB عبر OTG</button>
-   <button class="btn ghost full" id="forget-btn">فصل الجهاز</button>
-   <div id="usb-descriptors" class="descriptor-box">بانتظار اتصال USB...</div>
-   <div class="notice"><b>معلومة مهمة</b><p>VID 1F3A وPID EFE8 يتوافقان مع معرف FEL شائع في Allwinner، لكنهما لا يثبتان وحدهما هوية اللوحة أو توافق الروم.</p></div>
-   <div class="usb-capabilities"><span><i class="ok"></i> فحص أوصاف USB</span><span><i class="off"></i> قراءة RAM معطلة</span><span><i class="off"></i> كتابة / تنفيذ معطلان</span></div>
+  <article class="panel">
+    <div class="panel-head"><div><span class="num">03</span><h2>Partition Intelligence</h2><p>تحويل أحجام القطاعات إلى وحدات مقروءة.</p></div></div>
+    <div id="partitions" class="result empty">بانتظار sys_partition.fex</div>
   </article>
- </section>
-
- <section class="panel ai-panel">
-  <div class="panel-head"><div><span class="section-index">03 / RECOVERY INTELLIGENCE</span><h2>محرك تحليل واستنتاج</h2></div><span class="pill">RULE-BASED / TRANSPARENT</span></div>
-  <p class="muted">يحوّل نتائج الفحص إلى استنتاجات قابلة للتدقيق. هذا المحرك المحلي لا يدّعي الاتصال بنموذج ذكاء اصطناعي سحابي ولا يخترع معلومات غير موجودة.</p>
-  <div class="ai-grid">
-   <div class="ai-card"><small>Firmware container</small><strong id="ai-container">غير محدد</strong></div>
-   <div class="ai-card"><small>Boot components</small><strong id="ai-boot">لم تُفحص</strong></div>
-   <div class="ai-card"><small>USB state</small><strong id="ai-usb">غير متصل</strong></div>
-   <div class="ai-card"><small>Compatibility verdict</small><strong id="ai-verdict" class="amber">غير محسوم</strong></div>
-  </div>
-  <div class="action-row"><button class="btn primary" id="diagnose-btn" disabled>إنشاء تقرير التشخيص</button><button class="btn ghost" id="copy-btn">نسخ ملخص التشخيص</button></div>
-  <pre id="ai-report" class="report-box">اختر الروم وافحص USB أولاً، ثم أنشئ تقرير التشخيص.</pre>
- </section>
-
- <section class="panel evidence-panel" id="hardware-evidence-panel">
-  <div class="panel-head"><div><span class="section-index">04 / HARDWARE COMPATIBILITY</span><h2>سجل أدلة توافق اللوحة</h2></div><span class="pill locked">EVIDENCE REQUIRED</span></div>
-  <p class="muted">أدخل فقط المعلومات الموجودة في وثائق موثوقة أو تقرير فني. لا تفتح الجهاز ولا تفكّه بنفسك؛ يمكن لفني مؤهل تسجيل بيانات الشرائح واللوحة. كل ما يُدخل هنا يبقى "معلومة مقدمة" ولا يتحول تلقائياً إلى إثبات.</p>
-  <div class="evidence-grid">
-   <label>رمز اللوحة / Board ID<input id="ev-board" type="text" placeholder="مثال: رمز مطبوع على PCB"></label>
-   <label>مراجعة اللوحة / PCB Revision<input id="ev-revision" type="text" placeholder="Rev / Version كما هو مطبوع"></label>
-   <label>علامة شريحة DRAM<input id="ev-dram" type="text" placeholder="رقم القطعة المطبوع على الشريحة"></label>
-   <label>مصدر إعداد DRAM<input id="ev-dram-source" type="text" placeholder="Datasheet / vendor config / technician report"></label>
-   <label>علامة شريحة eMMC<input id="ev-emmc" type="text" placeholder="رقم القطعة أو الشركة والطراز"></label>
-   <label>سعة eMMC الموثقة<input id="ev-emmc-size" type="text" placeholder="السعة حسب وثيقة أو تقرير فني"></label>
-   <label>مصدر خريطة الأقسام<input id="ev-partition" type="text" placeholder="Partition table / scatter / service documentation"></label>
-   <label>مرجع التحقق المستقل<input id="ev-review" type="text" placeholder="اسم التقرير الفني أو مرجعه"></label>
-  </div>
-  <div class="evidence-actions"><button class="btn primary" id="evidence-save-btn" type="button">حفظ الأدلة في التقرير</button><button class="btn ghost" id="evidence-clear-btn" type="button">مسح الحقول</button></div>
-  <div id="evidence-status" class="evidence-status">لم تُسجّل أدلة إضافية. عناصر التوافق الأربعة ما زالت غير مثبتة.</div>
-  <pre id="evidence-report" class="report-box">PCB: MISSING
-DRAM: MISSING
-eMMC: MISSING
-PARTITION MAP: MISSING
-INDEPENDENT VALIDATION: MISSING</pre>
- </section>
-
- <section class="panel flash-panel">
-  <div class="panel-head"><div><span class="section-index">04 / FLASH CENTER</span><h2>مركز الاستعادة والفلاش</h2></div><span class="pill locked">HARD SAFETY LOCK</span></div>
-  <div class="flash-banner"><div class="lock-icon">▣</div><div><b>FLASH EXECUTION IS LOCKED</b><p>الواجهة جاهزة لتجهيز خطة الاستعادة، لكن الكتابة الدائمة غير مفعلة لأن توافق اللوحة وDRAM وeMMC لم يُثبت بعد.</p></div></div>
-  <div class="flash-grid">
-   <div class="flash-step"><span>01</span><b>Board identity</b><small id="check-board">غير مؤكد</small></div>
-   <div class="flash-step"><span>02</span><b>DRAM profile</b><small id="check-dram">غير مؤكد</small></div>
-   <div class="flash-step"><span>03</span><b>Boot0 / SPL match</b><small id="check-boot">غير مؤكد</small></div>
-   <div class="flash-step"><span>04</span><b>eMMC geometry</b><small id="check-emmc">غير مؤكد</small></div>
-   <div class="flash-step"><span>05</span><b>Partition map</b><small id="check-partition">غير مؤكد</small></div>
-   <div class="flash-step"><span>06</span><b>Independent validation</b><small id="check-validation">غير مكتمل</small></div>
-  </div>
-  <div class="flash-controls"><button class="btn disabled" id="prepare-flash-btn" disabled>تجهيز الفلاش — غير متاح حالياً</button><span id="flash-lock-reason">لا توجد أدلة كافية للسماح بالكتابة إلى الذاكرة.</span></div>
-  <p class="fineprint">لا تستخدم ملفات Boot0 أو SPL أو عناوين ذاكرة مأخوذة من جهاز آخر. خطأ واحد في تهيئة DRAM أو تخطيط eMMC قد يمنع الإقلاع نهائياً.</p>
- </section>
-
- <section class="panel findings-panel">
-  <div class="panel-head"><div><span class="section-index">06 / EVENT LOG</span><h2>سجل العمليات</h2></div><button class="text-btn" id="clear-log">مسح السجل</button></div>
-  <div id="console" class="console" aria-live="polite"><div class="log-line"><time>READY</time><span>ARTEMIS R69 بدأ التشغيل. لا توجد عمليات على الجهاز.</span></div></div>
- </section>
- <section class="disclaimer"><span>ⓘ</span><p><b>حدود الدقة:</b> التواقيع لا تثبت حدود الأقسام أو توافق الملفات. فحص أوصاف USB لا يساوي مصافحة FEL. لا يمكن للمتصفح استنتاج نوع DRAM أو خريطة eMMC دون بيانات موثوقة من الجهاز واللوحة.</p></section>
-</main>
-<footer>ARTEMIS R69 <span>•</span> COMPLETE DIAGNOSTIC BUILD 5.0 <span>•</span> LOCAL-FIRST / GUARDED RECOVERY</footer>
-<script src="./app.js"></script>
+</section>
+<section class="panel">
+  <div class="panel-head"><div><span class="num">04</span><h2>Boot & Binary Inspector</h2><p>تعرّف التواقيع وسلاسل النصوص دون تعديل الملفات.</p></div></div>
+  <div id="binary" class="result empty">لم يتم تحليل ملفات ثنائية بعد</div>
+</section>
+<section class="panel">
+  <div class="panel-head"><div><span class="num">05</span><h2>FEL Device Check</h2><p>طلب صلاحية USB لعرض معلومات التعريف فقط. لا يتم إرسال أوامر FEL.</p></div></div>
+  <div class="device-row"><div><b>Allwinner FEL candidate</b><small>VID 1F3A · PID EFE8 (المعرّف الذي ظهر في فحصك السابق)</small></div><button id="usb" class="secondary">فحص جهاز USB</button></div>
+  <div id="usbstatus" class="result empty">لم يبدأ فحص USB</div>
+</section>
+<section class="panel flash">
+  <div class="panel-head"><div><span class="num">06</span><h2>Flash Center</h2><p>بوابة التحقق قبل الاستعادة.</p></div><span class="lock">🔒 WRITE PROTECTED</span></div>
+  <div class="warning"><b>الكتابة على Boot0 أو eMMC غير مفعّلة.</b><br>وجود دعم MMC داخل U-Boot لا يثبت أن اتصال FEL اكتمل، ولا يثبت تطابق صورة الإقلاع مع اللوحة الفعلية. هذا الإصدار يفحص الملفات ويصدر تقريراً فقط، ولا ينفذ erase أو write أو burn.</div>
+  <div class="checklist"><span>✓ تحليل محلي للملفات</span><span>✓ كشف التواقيع</span><span>✓ حساب أحجام الأقسام</span><span class="blocked">✕ كتابة Boot0 / U-Boot</span></div>
+</section>
+<footer><span>ARTEMIS R69 V6</span><span>LOCAL ANALYSIS · NO FLASH WRITES</span></footer>
+</div>
+<script src="app.js"></script>
 </body></html>

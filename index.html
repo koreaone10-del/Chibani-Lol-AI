@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#080d18">
 <meta name="description" content="ARTEMIS R69 — Firmware forensics, Allwinner FEL USB diagnostics and guarded recovery planning.">
-<title>ARTEMIS R69 | Recovery Intelligence</title>
+<title>ARTEMIS R69 v5 | Hardware Compatibility Intelligence</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./style.css">
@@ -68,6 +68,28 @@
   <pre id="ai-report" class="report-box">اختر الروم وافحص USB أولاً، ثم أنشئ تقرير التشخيص.</pre>
  </section>
 
+ <section class="panel evidence-panel" id="hardware-evidence-panel">
+  <div class="panel-head"><div><span class="section-index">04 / HARDWARE COMPATIBILITY</span><h2>سجل أدلة توافق اللوحة</h2></div><span class="pill locked">EVIDENCE REQUIRED</span></div>
+  <p class="muted">أدخل فقط المعلومات الموجودة في وثائق موثوقة أو تقرير فني. لا تفتح الجهاز ولا تفكّه بنفسك؛ يمكن لفني مؤهل تسجيل بيانات الشرائح واللوحة. كل ما يُدخل هنا يبقى "معلومة مقدمة" ولا يتحول تلقائياً إلى إثبات.</p>
+  <div class="evidence-grid">
+   <label>رمز اللوحة / Board ID<input id="ev-board" type="text" placeholder="مثال: رمز مطبوع على PCB"></label>
+   <label>مراجعة اللوحة / PCB Revision<input id="ev-revision" type="text" placeholder="Rev / Version كما هو مطبوع"></label>
+   <label>علامة شريحة DRAM<input id="ev-dram" type="text" placeholder="رقم القطعة المطبوع على الشريحة"></label>
+   <label>مصدر إعداد DRAM<input id="ev-dram-source" type="text" placeholder="Datasheet / vendor config / technician report"></label>
+   <label>علامة شريحة eMMC<input id="ev-emmc" type="text" placeholder="رقم القطعة أو الشركة والطراز"></label>
+   <label>سعة eMMC الموثقة<input id="ev-emmc-size" type="text" placeholder="السعة حسب وثيقة أو تقرير فني"></label>
+   <label>مصدر خريطة الأقسام<input id="ev-partition" type="text" placeholder="Partition table / scatter / service documentation"></label>
+   <label>مرجع التحقق المستقل<input id="ev-review" type="text" placeholder="اسم التقرير الفني أو مرجعه"></label>
+  </div>
+  <div class="evidence-actions"><button class="btn primary" id="evidence-save-btn" type="button">حفظ الأدلة في التقرير</button><button class="btn ghost" id="evidence-clear-btn" type="button">مسح الحقول</button></div>
+  <div id="evidence-status" class="evidence-status">لم تُسجّل أدلة إضافية. عناصر التوافق الأربعة ما زالت غير مثبتة.</div>
+  <pre id="evidence-report" class="report-box">PCB: MISSING
+DRAM: MISSING
+eMMC: MISSING
+PARTITION MAP: MISSING
+INDEPENDENT VALIDATION: MISSING</pre>
+ </section>
+
  <section class="panel flash-panel">
   <div class="panel-head"><div><span class="section-index">04 / FLASH CENTER</span><h2>مركز الاستعادة والفلاش</h2></div><span class="pill locked">HARD SAFETY LOCK</span></div>
   <div class="flash-banner"><div class="lock-icon">▣</div><div><b>FLASH EXECUTION IS LOCKED</b><p>الواجهة جاهزة لتجهيز خطة الاستعادة، لكن الكتابة الدائمة غير مفعلة لأن توافق اللوحة وDRAM وeMMC لم يُثبت بعد.</p></div></div>
@@ -84,11 +106,11 @@
  </section>
 
  <section class="panel findings-panel">
-  <div class="panel-head"><div><span class="section-index">05 / EVENT LOG</span><h2>سجل العمليات</h2></div><button class="text-btn" id="clear-log">مسح السجل</button></div>
+  <div class="panel-head"><div><span class="section-index">06 / EVENT LOG</span><h2>سجل العمليات</h2></div><button class="text-btn" id="clear-log">مسح السجل</button></div>
   <div id="console" class="console" aria-live="polite"><div class="log-line"><time>READY</time><span>ARTEMIS R69 بدأ التشغيل. لا توجد عمليات على الجهاز.</span></div></div>
  </section>
  <section class="disclaimer"><span>ⓘ</span><p><b>حدود الدقة:</b> التواقيع لا تثبت حدود الأقسام أو توافق الملفات. فحص أوصاف USB لا يساوي مصافحة FEL. لا يمكن للمتصفح استنتاج نوع DRAM أو خريطة eMMC دون بيانات موثوقة من الجهاز واللوحة.</p></section>
 </main>
-<footer>ARTEMIS R69 <span>•</span> COMPLETE DIAGNOSTIC BUILD 4.0 <span>•</span> LOCAL-FIRST / GUARDED RECOVERY</footer>
+<footer>ARTEMIS R69 <span>•</span> COMPLETE DIAGNOSTIC BUILD 5.0 <span>•</span> LOCAL-FIRST / GUARDED RECOVERY</footer>
 <script src="./app.js"></script>
 </body></html>

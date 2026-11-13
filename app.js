@@ -1,7 +1,7 @@
 (() => {
 "use strict";
 const $ = id => document.getElementById(id);
-const state = { file:null, report:null, device:null, claimed:false, iface:null, endpoints:null, usbDescription:null };
+const state = { file:null, report:null, device:null, claimed:false, iface:null, endpoints:null, usbDescription:null, evidence:null };
 const signatures = [
  ["IMAGEWTY","IMAGEWTY".split("").map(c=>c.charCodeAt(0))],
  ["imgRePacker","imgRePacker".split("").map(c=>c.charCodeAt(0))],
@@ -34,6 +34,8 @@ $("forget-btn").addEventListener("click",disconnectUsb);
 $("clear-log").addEventListener("click",()=>{$("console").replaceChildren();log("تم مسح السجل.");});
 $("diagnose-btn").addEventListener("click",buildDiagnosis);
 $("copy-btn").addEventListener("click",copyDiagnosis);
+$("evidence-save-btn").addEventListener("click",saveHardwareEvidence);
+$("evidence-clear-btn").addEventListener("click",clearHardwareEvidence);
 function updateUsb(){
  const d=state.device;
  if(!d){$("usb-state").textContent="غير متصل";$("usb-id").textContent="VID:PID غير معروف";$("usb-device-name").textContent="لا يوجد جهاز مختار";$("usb-device-detail").textContent="VID: — / PID: —";$("ai-usb").textContent="غير متصل";$("usb-descriptors").textContent="بانتظار اتصال USB...";return;}
@@ -141,35 +143,89 @@ function renderFindings(r){
  }
  box.append(grid);const note=document.createElement("p");note.className="muted";note.textContent=`حجم الملف: ${r.sizeBytes} bytes | Header (96 bytes): ${r.headerHex.slice(0,180)}…`;box.append(note);
 }
+function readHardwareEvidence(){
+ const fields=[
+  ["boardId","ev-board"],["pcbRevision","ev-revision"],["dramPartMarking","ev-dram"],
+  ["dramConfigurationSource","ev-dram-source"],["emmcPartMarking","ev-emmc"],
+  ["emmcCapacitySource","ev-emmc-size"],["partitionMapSource","ev-partition"],
+  ["independentReviewReference","ev-review"]
+ ];
+ const out={};for(const [key,id] of fields)out[key]=$(id).value.trim();return out;
+}
+function saveHardwareEvidence(){
+ state.evidence=readHardwareEvidence();
+ const e=state.evidence;
+ const groups={
+  "PCB identity":!!(e.boardId&&e.pcbRevision),
+  "DRAM identification":!!(e.dramPartMarking&&e.dramConfigurationSource),
+  "eMMC identification":!!(e.emmcPartMarking&&e.emmcCapacitySource),
+  "Partition map":!!e.partitionMapSource,
+  "Independent review reference":!!e.independentReviewReference
+ };
+ const lines=Object.entries(groups).map(([k,v])=>`${k}: ${v?"DATA ENTERED — NOT INDEPENDENTLY VERIFIED":"MISSING"}`);
+ $("evidence-report").textContent=lines.join("\n")+"\n\nAll values are user-entered references. ARTEMIS cannot authenticate physical markings or documents.";
+ const count=Object.values(groups).filter(Boolean).length;
+ $("evidence-status").textContent=`تم تسجيل الحقول. ${count}/5 فئات تحتوي بيانات، لكن لا توجد مصادقة مستقلة داخل التطبيق. حالة الفلاش تبقى LOCKED.`;
+ log("تم تسجيل بيانات التوافق المقدمة يدوياً؛ لم تُعامل كتحقق مستقل.","ok");
+ if(state.report)buildDiagnosis();
+}
+function clearHardwareEvidence(){
+ ["ev-board","ev-revision","ev-dram","ev-dram-source","ev-emmc","ev-emmc-size","ev-partition","ev-review"].forEach(id=>$(id).value="");
+ state.evidence=null;$("evidence-report").textContent="PCB: MISSING\nDRAM: MISSING\neMMC: MISSING\nPARTITION MAP: MISSING\nINDEPENDENT VALIDATION: MISSING";
+ $("evidence-status").textContent="تم مسح البيانات المدخلة. جميع عناصر التوافق غير مثبتة.";if(state.report)buildDiagnosis();
+}
 function buildDiagnosis(){
  if(!state.report){log("حلل ملف الروم أولاً.","error");return;}
- const r=state.report,usb=state.device;
- const counts=r.signatureCounts||{};
+ const r=state.report,usb=state.device,counts=r.signatureCounts||{};
  const found=Object.keys(counts).filter(k=>counts[k]>0);
+ const e=state.evidence||readHardwareEvidence();
+ const has=(...keys)=>keys.every(k=>String(e[k]||"").trim().length>0);
+ const checks={
+  "PCB identity":has("boardId","pcbRevision"),
+  "DRAM part + configuration source":has("dramPartMarking","dramConfigurationSource"),
+  "eMMC part + capacity source":has("emmcPartMarking","emmcCapacitySource"),
+  "Exact partition-map source":has("partitionMapSource"),
+  "Independent review reference":has("independentReviewReference")
+ };
  const lines=[
-  "ARTEMIS R69 — RECOVERY DIAGNOSTIC REPORT",
+  "ARTEMIS R69 — HARDWARE COMPATIBILITY REPORT v5.0",
   `Firmware: ${r.fileName}`,
-  `Size: ${r.sizeBytes} bytes`,
+  `Size: ${r.sizeBytes} bytes (${fmtSize(r.sizeBytes)})`,
   `IMAGEWTY signature at offset zero: ${r.imagewtyCandidate?"YES":"NOT CONFIRMED"}`,
-  `Detected signatures: ${found.length?found.join(", "):"none"}`,
-  `USB: ${usb?`VID ${usb.vendorId.toString(16)} / PID ${usb.productId.toString(16)}, opened=${usb.opened}`:"not connected"}`,
+  `Detected byte signatures: ${found.length?found.join(", "):"none"}`,
+  `USB: ${usb?`VID ${usb.vendorId.toString(16).padStart(4,"0")} / PID ${usb.productId.toString(16).padStart(4,"0")}, opened=${usb.opened}`:"not connected"}`,
   `USB interface claimed: ${state.claimed?"yes":"no"}`,
   "",
-  "KNOWN DEVICE CONTEXT (provided earlier):",
+  "HARDWARE EVIDENCE REGISTER (user-entered; not authenticated by ARTEMIS):",
+  `Board ID: ${e.boardId||"MISSING"}`,
+  `PCB revision: ${e.pcbRevision||"MISSING"}`,
+  `DRAM marking: ${e.dramPartMarking||"MISSING"}`,
+  `DRAM configuration source: ${e.dramConfigurationSource||"MISSING"}`,
+  `eMMC marking: ${e.emmcPartMarking||"MISSING"}`,
+  `eMMC capacity source: ${e.emmcCapacitySource||"MISSING"}`,
+  `Partition-map source: ${e.partitionMapSource||"MISSING"}`,
+  `Independent review reference: ${e.independentReviewReference||"MISSING"}`,
+  "",
+  "COMPATIBILITY CHECKLIST:",
+  ...Object.entries(checks).map(([k,v])=>`- ${k}: ${v?"DATA PROVIDED — VERIFICATION STILL REQUIRED":"MISSING"}`),
+  "",
+  "KNOWN CONTEXT (reported earlier; not independently confirmed by USB):",
   "- R69-EMCP v2.0; Allwinner H3 reported.",
-  "- ROM container reported as IMAGEWTY, about 1.36 GiB, 37 entries.",
+  "- Firmware container reported as IMAGEWTY, about 1.36 GiB, 37 entries.",
   "- sys_config.fex reports machine=dolphin-p1; this does not prove PCB identity.",
-  "- Boot0/boot package and DRAM profile require independent board matching.",
+  "- FEL VID/PID 1F3A:EFE8 and claimed USB interface prove descriptor access only, not a complete FEL handshake.",
   "",
   "VERDICT: NOT CLEARED FOR FLASH.",
-  "Reasons: PCB revision, DRAM part/configuration, eMMC geometry and exact partition mapping are not independently verified.",
-  "No FEL command was sent. No device memory was read or written.",
+  "User-entered values are leads for a qualified technician, not proof. A technician must independently match the PCB, DRAM initialization, boot chain, eMMC geometry and partition map against the exact board revision.",
+  "No FEL command was sent. No device memory was read or written. No flash operation is implemented.",
   "",
-  "This is a transparent rule-based report, not an output from a remote generative AI model."
+  "This is a transparent local rule-based report, not output from a remote generative AI model."
  ];
  $("ai-report").textContent=lines.join("\n");
  $("ai-verdict").textContent="NOT CLEARED";$("ai-verdict").className="amber";
- log("تم إنشاء تقرير تشخيص مبني على نتائج الفحص والحقائق المتاحة. الحالة: غير مصرح بالفلاش.","ok");
+ ["check-board","check-dram","check-boot","check-emmc","check-partition","check-validation"].forEach(id=>$(id).textContent="غير مثبت — يتطلب مراجعة فنية مستقلة");
+ $("flash-lock-reason").textContent="LOCKED: البيانات المدخلة لا تمنح إذن تفليش؛ التحقق الفني المستقل غير متاح آلياً.";
+ log("تم إنشاء تقرير توافق v5. الحالة: NOT CLEARED FOR FLASH.","ok");
 }
 function copyDiagnosis(){
  const t=$("ai-report").textContent;
@@ -178,11 +234,11 @@ function copyDiagnosis(){
 }
 function downloadReport(){
  if(!state.report)return;
- const payload={...state.report,usbDescription:state.usbDescription,diagnostic:$("ai-report").textContent};
+ const payload={...state.report,hardwareEvidence:state.evidence||readHardwareEvidence(),usbDescription:state.usbDescription,diagnostic:$("ai-report").textContent,safety:{flashExecution:false,felCommandsSent:false,deviceMemoryRead:false,deviceMemoryWritten:false}};
  const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob);
  const a=document.createElement("a");a.href=url;a.download="ARTEMIS-R69-report.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);log("تم تنزيل تقرير JSON.","ok");
 }
 if(!window.isSecureContext)log("تنبيه: WebUSB يتطلب HTTPS أو localhost.");
 if(!navigator.usb)log("WebUSB غير متاح في هذا المتصفح؛ تحليل الروم المحلي يبقى متاحاً.");
-log("ARTEMIS R69 v4.0 جاهز. مركز الفلاش مقفول حتى التحقق الهندسي من التوافق.");
+log("ARTEMIS R69 v5.0 جاهز. مركز الفلاش مقفول حتى التحقق الهندسي من التوافق.");
 })();

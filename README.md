@@ -1,37 +1,32 @@
-# ARTEMIS R69 — Complete Diagnostic Build 4.0
+# ARTEMIS R69 — Hardware Compatibility Intelligence v5.0
 
-This ZIP is a complete static-site replacement. Upload/replace the repository contents with these files; no extra script insertion is required.
+Complete static-site replacement for the R69 diagnostic workspace.
 
-## Files
-- `index.html` — complete Arabic RTL interface.
-- `style.css` — responsive dark interface.
-- `app.js` — local firmware signature scanner, JSON reporting, WebUSB descriptor inspection, diagnostic report, and guarded Flash Center.
+## Included
+- Arabic RTL responsive interface.
+- Local chunked firmware signature scan (4 MiB chunks).
+- JSON diagnostic export.
+- WebUSB descriptor inspection for the selected USB device.
+- Hardware evidence register for PCB, DRAM, eMMC, partition-map and independent-review references.
+- Report clearly separates user-entered evidence from independently verified facts.
+- Persistent Flash Center lock; no FEL command, RAM access, code execution, erase, or eMMC write is implemented.
 
 ## Deploy on Render
-Create/use a **Static Site**:
-- Build Command: leave empty
-- Publish Directory: `.`
-- No server, API key, package install, or build step is required.
+- Service type: Static Site
+- Build command: leave empty
+- Publish directory: `.`
+- Serve over HTTPS for WebUSB.
 
-The page must be served over HTTPS for WebUSB. Use a browser that supports WebUSB (for Android, Chrome is the usual option).
+## Important limitations
+USB VID/PID and descriptor access do not prove a complete FEL handshake or identify the PCB. A firmware signature scan does not parse or validate every IMAGEWTY entry, checksum, partition offset, DRAM profile, or bootloader compatibility. Values entered in the hardware evidence register are not authenticated by the app. A qualified technician must independently verify the exact PCB revision and memory components using reliable board documentation.
 
-## What works
-- Scans large firmware files locally in 4 MiB chunks.
-- Detects selected signatures: IMAGEWTY, imgRePacker, eGON.BT0, ANDROID!, BOOTPKG, UBOOT_, TOC1 and AVB0.
-- Exports a JSON report.
-- Opens an allowed USB device and inspects configuration/interface/endpoint descriptors.
-- Reports its findings and the current compatibility limitations.
-- Does not upload firmware to a server.
+Do not open or electrically modify the device as part of this software workflow. If physical markings are needed, have a qualified technician inspect the board and provide the documented values.
 
-## Flash safety
-The Flash Center is intentionally locked. This build does not implement FEL memory writes, FEL execution, eMMC writes, partition erasure, or flashing. The available ROM/board evidence is not enough to safely determine the exact PCB revision, DRAM initialization profile, eMMC geometry, and compatible boot chain. A generic or guessed flashing path can permanently prevent boot.
+## Files
+- `index.html`
+- `style.css`
+- `app.js`
+- `README.md`
+- `BUILD_INFO.json`
 
-The app does not claim that VID/PID selection is a complete FEL handshake. It inspects USB descriptors only. The AI-labelled panel is a transparent local rule-based diagnostic engine, not a remote LLM.
-
-## Replace repository contents from a phone
-1. Download and extract this ZIP.
-2. In GitHub mobile, open the target repository and replace `index.html`, `style.css`, `app.js`, and `README.md` with the files from this ZIP (or upload the extracted folder contents).
-3. Commit the replacement.
-4. Render redeploys from the repository if auto-deploy is enabled.
-
-No manual script line is required: `index.html` already loads `app.js`.
+No manual script insertion is required; `index.html` already loads `app.js`.

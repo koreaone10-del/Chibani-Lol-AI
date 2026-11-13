@@ -1,10 +1,20 @@
 {
-  "name": "ARTEMIS R69 Complete Diagnostic Build",
-  "version": "4.0.0",
+  "name": "ARTEMIS R69 Hardware Compatibility Intelligence",
+  "version": "5.0.0",
   "build_type": "static_site",
   "entry": "index.html",
-  "safety_mode": "read_only_usb_descriptor_inspection",
-  "flash_execution": "disabled_pending_hardware_compatibility_validation",
+  "safety_mode": "read_only_usb_descriptor_inspection_and_local_firmware_scan",
+  "flash_execution": false,
+  "fel_commands": false,
+  "device_memory_read": false,
+  "device_memory_write": false,
+  "features": [
+    "local_chunked_signature_scan",
+    "usb_descriptor_inspection",
+    "hardware_evidence_register",
+    "transparent_rule_based_compatibility_report",
+    "json_export"
+  ],
   "files": [
     "index.html",
     "style.css",
